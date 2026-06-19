@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Trophy, Medal, Search, BookOpen, 
-  Sparkles, TrendingUp, GraduationCap
+  Sparkles, TrendingUp, GraduationCap, Download
 } from "lucide-react";
 import { Student } from "../types";
 import { GRADES } from "../data/mockData";
@@ -73,6 +73,33 @@ export default function LeadershipSection({ students }: LeadershipSectionProps) 
   const podium = useMemo(() => {
     return sortedAllStudents.slice(0, 3);
   }, [sortedAllStudents]);
+
+  const downloadLeaderboardCSV = () => {
+    // Generate CSV headers with excel compatibility
+    const headers = ["O'rin", "O'quvchi", "Sinf", "Darajasi", "Mutolaalar Soni", "To'plangan ball (bet)"];
+    
+    // Rows
+    const rows = filteredStudents.map((st, i) => [
+      i + 1,
+      `${st.firstName} ${st.lastName}`,
+      `${st.grade}-sinf`,
+      getReadingLevel(st.totalPoints).title,
+      st.readingLogs.length,
+      st.totalPoints
+    ]);
+    
+    // Convert to CSV format with unicode BOM for Cyrillic / Uzbek support
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(","))].join("\r\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Zukko_Kitobxon_Reyting_${selectedGradeFilter === "all" ? "Barcha_sinflar" : selectedGradeFilter + "_sinf"}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-10 pb-12">
@@ -227,6 +254,16 @@ export default function LeadershipSection({ students }: LeadershipSectionProps) 
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Download button */}
+            <button
+              onClick={downloadLeaderboardCSV}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all rounded-lg text-xs font-medium cursor-pointer"
+              title="Jadvaldagi barcha ma'lumotlarni Excel/CSV formatida yuklab olish"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              Yuklab olish
+            </button>
+
             {/* Class filter dropdown */}
             <select
               value={selectedGradeFilter}

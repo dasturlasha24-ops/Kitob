@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   ArrowLeft, Users, BookOpen, UserPlus, Search, 
-  ChevronRight, Award, Plus, Trash2, Calendar, FileText, Check
+  ChevronRight, Award, Plus, Trash2, Calendar, FileText, Check, Download
 } from "lucide-react";
 import { Student, ReadingLog } from "../types";
 import { MOCK_BOOKS } from "../data/mockData";
@@ -63,6 +63,28 @@ export default function ClassDetailView({
     setTimeout(() => setLogSuccessStudentId(null), 3000);
   };
 
+  const downloadClassCSV = () => {
+    const headers = ["O'rin", "O'quvchi", "Sinf", "Jami o'qilgan kitoblar", "To'plangan ball (bet)", "Sana"];
+    const rows = filteredStudents.map((st, i) => [
+      i + 1,
+      `${st.firstName} ${st.lastName}`,
+      `${st.grade}-sinf`,
+      st.readingLogs.length,
+      st.totalPoints,
+      new Date(st.createdAt).toLocaleDateString("uz-UZ")
+    ]);
+    
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(","))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Zukko_Kitobxon_${grade}_sinf_Ruyxati.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header back & action row */}
@@ -89,13 +111,24 @@ export default function ClassDetailView({
           </div>
         </div>
 
-        <button
-          onClick={onOpenAddStudent}
-          className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-2xl shadow-lg shadow-blue-600/20 cursor-pointer transition-all font-display"
-        >
-          <UserPlus className="w-5 h-5" />
-          O'quvchi qo'shish
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={downloadClassCSV}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white font-medium rounded-xl text-sm transition-all cursor-pointer shadow-md"
+            title="Sinf o'quvchilari ma'lumotlarini Excel/CSV formatida yuklab olish"
+          >
+            <Download className="w-4 h-4 text-emerald-400" />
+            Excel yuklab olish
+          </button>
+
+          <button
+            onClick={onOpenAddStudent}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/20 cursor-pointer transition-all font-display text-sm"
+          >
+            <UserPlus className="w-5 h-5" />
+            O'quvchi qo'shish
+          </button>
+        </div>
       </div>
 
       {/* Analytical Quick Stats Info Banner */}

@@ -220,15 +220,28 @@ export default function App() {
                       Maktab kutubxonasiga moslashtirilgan ball tizimi. O'quvchilar o'qigan kitoblarining betlarini kiritib boradilar, 
                       har bir o'qilgan sahifa 1 ball sifatida hisoblanadi va sinflararo sog'lom raqobatni shakllantiradi!
                     </p>
-                    <div className="pt-2 flex flex-wrap items-center gap-4 sm:gap-6">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-ping" />
-                        <span className="text-xs text-slate-400">5-11 sinflar o'rtasida</span>
+                    <div className="pt-2 flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-blue-400 rounded-full animate-ping" />
+                          <span className="text-xs text-slate-400">5-11 sinflar o'rtasida</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <BookMarked className="w-4 h-4 text-emerald-450" />
+                          <span className="text-xs text-slate-400">1 bet = 1 ball formula</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <BookMarked className="w-4 h-4 text-emerald-450" />
-                        <span className="text-xs text-slate-400">1 bet = 1 ball formula</span>
-                      </div>
+
+                      <button
+                        onClick={() => {
+                          setStudents([]);
+                          localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 hover:text-rose-400 border border-rose-500/20 text-[11px] font-medium font-sans rounded-xl transition-all duration-200 cursor-pointer shadow-md shadow-rose-950/10"
+                        title="Barcha kiritilgan o'quvchilarni o'chirish va toza holatga qaytarish"
+                      >
+                        Ma'lumotlarni Tozalash (Reset)
+                      </button>
                     </div>
                   </div>
                 </div>
