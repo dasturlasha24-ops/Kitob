@@ -13,6 +13,7 @@ import LeadershipSection from "./components/LeadershipSection";
 import AddStudentModal from "./components/AddStudentModal";
 import SuccessPopup from "./components/SuccessPopup";
 import LogSuccessPopup from "./components/LogSuccessPopup";
+import ConfirmModal from "./components/ConfirmModal";
 
 export default function App() {
   // State for active menu section
@@ -53,6 +54,9 @@ export default function App() {
 
   // Hover tracking status for desktop collapsible sidebar
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+
+  // State to control reset confirmation modal
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   // Persist students to localStorage anytime the state is modified
   useEffect(() => {
@@ -233,10 +237,7 @@ export default function App() {
                       </div>
 
                       <button
-                        onClick={() => {
-                          setStudents([]);
-                          localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
-                        }}
+                        onClick={() => setIsResetConfirmOpen(true)}
                         className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 hover:text-rose-400 border border-rose-500/20 text-[11px] font-medium font-sans rounded-xl transition-all duration-200 cursor-pointer shadow-md shadow-rose-950/10"
                         title="Barcha kiritilgan o'quvchilarni o'chirish va toza holatga qaytarish"
                       >
@@ -386,6 +387,21 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* 7. Custom Confirm Modal for Great System Reset */}
+      <ConfirmModal
+        isOpen={isResetConfirmOpen}
+        onClose={() => setIsResetConfirmOpen(false)}
+        onConfirm={() => {
+          setStudents([]);
+          localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
+        }}
+        title="Ma'lumotlarni Tozalash"
+        message="Siz haqiqatan ham barcha o'quvchilar va ularning kiritilgan kitobxonlik natijalarini o'chirib, loyihani toza holatga keltirmoqchimisiz? Ushbu amalni ortga qaytarib bo'lmaydi!"
+        confirmLabel="Ha, tozalash"
+        cancelLabel="Bekor qilish"
+        isDanger={true}
+      />
 
     </div>
   );

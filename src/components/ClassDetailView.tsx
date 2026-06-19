@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Student, ReadingLog } from "../types";
 import { MOCK_BOOKS } from "../data/mockData";
+import ConfirmModal from "./ConfirmModal";
 
 interface ClassDetailViewProps {
   grade: string;
@@ -26,6 +27,11 @@ export default function ClassDetailView({
 }: ClassDetailViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+  
+  // Custom confirmation modal states for student deletion
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [deleteTargetStudentId, setDeleteTargetStudentId] = useState<string | null>(null);
+  const [deleteTargetStudentName, setDeleteTargetStudentName] = useState("");
   
   // State for new reading log input
   const [bookTitle, setBookTitle] = useState("");
@@ -64,22 +70,120 @@ export default function ClassDetailView({
   };
 
   const downloadClassCSV = () => {
-    const headers = ["O'rin", "O'quvchi", "Sinf", "Jami o'qilgan kitoblar", "To'plangan ball (bet)", "Sana"];
-    const rows = filteredStudents.map((st, i) => [
-      i + 1,
-      `${st.firstName} ${st.lastName}`,
-      `${st.grade}-sinf`,
-      st.readingLogs.length,
-      st.totalPoints,
-      new Date(st.createdAt).toLocaleDateString("uz-UZ")
-    ]);
+    // Sort students by total points descending to present correct ranking/student order
+    const sortedStudents = [...filteredStudents].sort((a, b) => b.totalPoints - a.totalPoints);
     
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(","))].join("\r\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const sheetName = `${grade}-sinf Ro'yxati`;
+    let tableRows = "";
+    
+    sortedStudents.forEach((st, i) => {
+      const isOdd = i % 2 === 1;
+      let rankStyle = "";
+      let medal = "";
+      
+      if (i === 0) {
+        rankStyle = "style='background-color: #fefaa6; color: #854d0e; font-weight: bold; font-size: 14px;'";
+        medal = " 🥇";
+      } else if (i === 1) {
+        rankStyle = "style='background-color: #f1f5f9; color: #475569; font-weight: bold; font-size: 13px;'";
+        medal = " 🥈";
+      } else if (i === 2) {
+        rankStyle = "style='background-color: #ffedd5; color: #c2410c; font-weight: bold; font-size: 13px;'";
+        medal = " 🥉";
+      } else {
+        rankStyle = isOdd ? "style='background-color: #f8fafc;'" : "";
+      }
+      
+      tableRows += `
+        <tr ${isOdd && i > 2 ? "style='background-color: #f8fafc;'" : ""}>
+          <td align="center" ${rankStyle}>${i + 1}${medal}</td>
+          <td style="font-weight: 500; font-size: 13px; color: #0f172a;">${st.firstName} ${st.lastName}</td>
+          <td align="center" style="font-weight: 550;">${st.grade}-sinf</td>
+          <td align="center" style="font-weight: bold; color: #0284c7;">${st.readingLogs.length} ta kitob</td>
+          <td align="center" style="font-weight: bold; color: #10b981; font-size: 13px;">${st.totalPoints} bet</td>
+          <td align="center">${new Date(st.createdAt).toLocaleDateString("uz-UZ")}</td>
+        </tr>
+      `;
+    });
+
+    const totalBooks = sortedStudents.reduce((sum, st) => sum + st.readingLogs.length, 0);
+    const totalPages = sortedStudents.reduce((sum, st) => sum + st.totalPoints, 0);
+
+    const excelTemplate = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>${sheetName.substring(0, 30)}</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table { border-collapse: collapse; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+          th { background-color: #0284c7; color: #ffffff; font-weight: bold; font-size: 13px; padding: 12px 10px; border: 1px solid #cbd5e1; text-transform: uppercase; }
+          td { padding: 10px 12px; border: 1px solid #e2e8f0; font-size: 12px; color: #334155; }
+          .meta-title { font-size: 18px; font-weight: bold; color: #0369a1; background-color: #f0f9ff; padding: 15px 0; }
+          .meta-label { font-weight: bold; color: #475569; background-color: #f8fafc; }
+          .meta-val { color: #0f172a; }
+          .total-row { background-color: #ecfeff; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr>
+            <td colspan="6" class="meta-title" align="center">ZUKKO KITOBXON - ${grade.toUpperCase()} REYTINQI</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="meta-label">Sinf:</td>
+            <td colspan="4" class="meta-val">${grade}</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="meta-label">Yuklangan sana:</td>
+            <td colspan="4" class="meta-val">${new Date().toLocaleString("uz-UZ")}</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="meta-label">O'quvchilar soni:</td>
+            <td colspan="4" class="meta-val">${sortedStudents.length} nafar</td>
+          </tr>
+          <tr><td colspan="6" style="border: none; height: 10px;"></td></tr>
+          <thead>
+            <tr>
+              <th width="80">O'rin</th>
+              <th width="200">O'quvchi ismi familiyasi</th>
+              <th width="100">Sinf</th>
+              <th width="150">O'qilgan kitoblar</th>
+              <th width="150">To'plangan ball (bet)</th>
+              <th width="150">A'zo bo'lgan sana</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+            <tr class="total-row">
+              <td colspan="3" align="right" style="padding: 12px; font-size: 13px;"><b>Sinf jami ko'rsatkichlari:</b></td>
+              <td align="center" style="color: #0284c7; font-size: 13px;"><b>${totalBooks} ta kitob</b></td>
+              <td align="center" style="color: #10b981; font-size: 13px;"><b>${totalPages} ball (bet)</b></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    
+    const blob = new Blob([excelTemplate], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Zukko_Kitobxon_${grade}_sinf_Ruyxati.csv`);
+    link.setAttribute("download", `Zukko_Kitobxon_${grade}_sinf_Ro'yxati.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -273,9 +377,9 @@ export default function ClassDetailView({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if(confirm(`${student.firstName} ${student.lastName}ni o'chirishni istaysizmi?`)) {
-                              onDeleteStudent(student.id);
-                            }
+                            setDeleteTargetStudentId(student.id);
+                            setDeleteTargetStudentName(`${student.firstName} ${student.lastName}`);
+                            setIsDeleteConfirmOpen(true);
                           }}
                           className="p-2 text-slate-450 hover:text-rose-450 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
                           title="O'quvchini o'chirish"
@@ -418,6 +522,26 @@ export default function ClassDetailView({
           })}
         </div>
       )}
+
+      {/* Custom Confirmation Dialog for student deletion */}
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => {
+          setIsDeleteConfirmOpen(false);
+          setDeleteTargetStudentId(null);
+          setDeleteTargetStudentName("");
+        }}
+        onConfirm={() => {
+          if (deleteTargetStudentId && onDeleteStudent) {
+            onDeleteStudent(deleteTargetStudentId);
+          }
+        }}
+        title="O'quvchini O'chirish"
+        message={`Siz haqiqatan ham ${deleteTargetStudentName || "ushbu o'quvchi"}ni o'chirishni istaysizmi? Ushbu o'quvchining barcha o'qish tarixi ham o'chib ketadi.`}
+        confirmLabel="Ha, o'chirish"
+        cancelLabel="Bekor qilish"
+        isDanger={true}
+      />
     </div>
   );
 }

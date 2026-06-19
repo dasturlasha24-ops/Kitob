@@ -75,27 +75,119 @@ export default function LeadershipSection({ students }: LeadershipSectionProps) 
   }, [sortedAllStudents]);
 
   const downloadLeaderboardCSV = () => {
-    // Generate CSV headers with excel compatibility
-    const headers = ["O'rin", "O'quvchi", "Sinf", "Darajasi", "Mutolaalar Soni", "To'plangan ball (bet)"];
+    // Generate beautiful spreadsheet with premium colors and styles
+    const sheetName = selectedGradeFilter === "all" ? "Barcha sinflar reytingi" : `${selectedGradeFilter}-sinf reytingi`;
+    let tableRows = "";
     
-    // Rows
-    const rows = filteredStudents.map((st, i) => [
-      i + 1,
-      `${st.firstName} ${st.lastName}`,
-      `${st.grade}-sinf`,
-      getReadingLevel(st.totalPoints).title,
-      st.readingLogs.length,
-      st.totalPoints
-    ]);
+    filteredStudents.forEach((st, i) => {
+      const isOdd = i % 2 === 1;
+      let rankStyle = "";
+      let medal = "";
+      
+      if (i === 0) {
+        rankStyle = "style='background-color: #fefaa6; color: #854d0e; font-weight: bold; font-size: 14px;'";
+        medal = " 🥇";
+      } else if (i === 1) {
+        rankStyle = "style='background-color: #f1f5f9; color: #475569; font-weight: bold; font-size: 13px;'";
+        medal = " 🥈";
+      } else if (i === 2) {
+        rankStyle = "style='background-color: #ffedd5; color: #c2410c; font-weight: bold; font-size: 13px;'";
+        medal = " 🥉";
+      } else {
+        rankStyle = isOdd ? "style='background-color: #f8fafc;'" : "";
+      }
+
+      const level = getReadingLevel(st.totalPoints).title;
+      
+      tableRows += `
+        <tr ${isOdd && i > 2 ? "style='background-color: #f8fafc;'" : ""}>
+          <td align="center" ${rankStyle}>${i + 1}${medal}</td>
+          <td style="font-weight: 500; font-size: 13px; color: #0f172a;">${st.firstName} ${st.lastName}</td>
+          <td align="center" style="font-weight: 550;">${st.grade}</td>
+          <td align="center" style="color: #6366f1; font-weight: bold;">${level}</td>
+          <td align="center" style="color: #0284c7; font-weight: bold;">${st.readingLogs.length} ta kitob</td>
+          <td align="center" style="color: #10b981; font-weight: bold; font-size: 13px;">${st.totalPoints} bet</td>
+        </tr>
+      `;
+    });
+
+    const totalBooks = filteredStudents.reduce((sum, st) => sum + st.readingLogs.length, 0);
+    const totalPages = filteredStudents.reduce((sum, st) => sum + st.totalPoints, 0);
+
+    const excelTemplate = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>${sheetName.substring(0, 30)}</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table { border-collapse: collapse; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+          th { background-color: #4f46e5; color: #ffffff; font-weight: bold; font-size: 13px; padding: 12px 10px; border: 1px solid #cbd5e1; text-transform: uppercase; }
+          td { padding: 10px 12px; border: 1px solid #e2e8f0; font-size: 12px; color: #334155; }
+          .meta-title { font-size: 18px; font-weight: bold; color: #1e1b4b; background-color: #f1f5f9; padding: 15px 0; }
+          .meta-label { font-weight: bold; color: #475569; background-color: #f8fafc; }
+          .meta-val { color: #0f172a; }
+          .total-row { background-color: #f5f3ff; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr>
+            <td colspan="6" class="meta-title" align="center">ZUKKO KITOBXON - PESHQADAMLAR REYTINGI</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="meta-label">Sinf filtri:</td>
+            <td colspan="4" class="meta-val">${selectedGradeFilter === "all" ? "Barcha sinflar" : selectedGradeFilter}</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="meta-label">Yuklangan sana:</td>
+            <td colspan="4" class="meta-val">${new Date().toLocaleString("uz-UZ")}</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="meta-label">O'quvchilar soni:</td>
+            <td colspan="4" class="meta-val">${filteredStudents.length} nafar</td>
+          </tr>
+          <tr><td colspan="6" style="border: none; height: 10px;"></td></tr>
+          <thead>
+            <tr>
+              <th width="80">O'rin</th>
+              <th width="200">O'quvchi ismi familiyasi</th>
+              <th width="100">Sinf</th>
+              <th width="150">Kitobxon darajasi</th>
+              <th width="150">O'qilgan kitoblar</th>
+              <th width="150">To'plangan ball (bet)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+            <tr class="total-row">
+              <td colspan="4" align="right" style="padding: 12px; font-size: 13px;"><b>Jami hisoblangan ko'rsatkichlar:</b></td>
+              <td align="center" style="color: #4f46e5; font-size: 13px;"><b>${totalBooks} ta kitob</b></td>
+              <td align="center" style="color: #10b981; font-size: 13px;"><b>${totalPages} ball</b></td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
     
-    // Convert to CSV format with unicode BOM for Cyrillic / Uzbek support
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(","))].join("\r\n");
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([excelTemplate], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Zukko_Kitobxon_Reyting_${selectedGradeFilter === "all" ? "Barcha_sinflar" : selectedGradeFilter + "_sinf"}.csv`);
+    link.setAttribute("download", `Zukko_Kitobxon_Reyting_${selectedGradeFilter === "all" ? "Barcha_sinflar" : selectedGradeFilter + "_sinf"}.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
