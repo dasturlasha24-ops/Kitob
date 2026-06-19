@@ -1,0 +1,6 @@
+{
+  "name": "Kitobxonlar Ball Tizimi",
+  "description": "5-11-sinf o'shun o'quvchilari o'rtasida kitobxonlik musobaqasi, o'qilgan kitob sahifalarini kiritish va umumiy reyting monitoring tizimi",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
