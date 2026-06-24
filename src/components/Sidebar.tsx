@@ -1,6 +1,4 @@
 import { BookOpen, Award, Users, Trophy, Flame, Settings, LogOut } from "lucide-react";
-import { signOut } from "firebase/auth";
-import { auth } from "../firebase";
 
 interface SidebarProps {
   activeTab: "students" | "rating" | "settings";
@@ -10,6 +8,7 @@ interface SidebarProps {
   topStudentName?: string;
   topStudentPoints?: number;
   isHovered?: boolean;
+  onLogout: () => void;
 }
 
 export default function Sidebar({
@@ -19,8 +18,10 @@ export default function Sidebar({
   totalPagesRead,
   topStudentName = "Yuklanmoqda...",
   topStudentPoints = 0,
-  isHovered = false
+  isHovered = false,
+  onLogout
 }: SidebarProps) {
+
   return (
     <aside className={`w-full ${isHovered ? "lg:w-72" : "lg:w-20"} bg-[#090b0f]/98 backdrop-blur-3xl border-r border-white/10 text-slate-100 flex flex-col shrink-0 md:h-screen sticky top-0 z-40 sidebar-smooth-transition overflow-hidden shadow-2xl`}>
       {/* Brand logo & title */}
@@ -121,11 +122,7 @@ export default function Sidebar({
 
         {/* Chiqish (Logout) Button */}
         <button
-          onClick={() => {
-            if (window.confirm("Tizimdan chiqishni xohlaysizmi?")) {
-              signOut(auth);
-            }
-          }}
+          onClick={onLogout}
           className="w-full flex items-center justify-between px-3.5 py-3 rounded-2xl sidebar-smooth-transition outline-none cursor-pointer text-slate-400 hover:text-rose-450 hover:bg-rose-500/10 group"
           title="Tizimdan Chiqish"
         >

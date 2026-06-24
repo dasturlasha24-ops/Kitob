@@ -9,7 +9,7 @@ import { Student } from "./types";
 import { GRADES, INITIAL_STUDENTS } from "./data/mockData";
 import { db, auth, handleFirestoreError, OperationType } from "./firebase";
 import { collection, onSnapshot, query, orderBy, setDoc, doc, deleteDoc, writeBatch, getDocs } from "firebase/firestore";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import Sidebar from "./components/Sidebar";
 import ClassDetailView from "./components/ClassDetailView";
 import LeadershipSection from "./components/LeadershipSection";
@@ -64,6 +64,9 @@ export default function App() {
 
   // State to control reset confirmation modal
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+
+  // State to control logout confirmation modal
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   // Authentication states
   const [user, setUser] = useState<User | null>(null);
@@ -265,6 +268,7 @@ export default function App() {
           topStudentName={topStudent ? `${topStudent.firstName} ${topStudent.lastName}` : undefined}
           topStudentPoints={topStudent ? topStudent.totalPoints : undefined}
           isHovered={isSidebarHovered}
+          onLogout={() => setIsLogoutConfirmOpen(true)}
         />
 
         {/* Backdrop for mobile drawer */}
@@ -495,6 +499,18 @@ export default function App() {
         title="Ma'lumotlarni Tozalash"
         message="Siz haqiqatan ham barcha o'quvchilar va ularning kiritilgan kitobxonlik natijalarini o'chirib, loyihani toza holatga keltirmoqchimisiz? Ushbu amalni ortga qaytarib bo'lmaydi!"
         confirmLabel="Ha, tozalash"
+        cancelLabel="Bekor qilish"
+        isDanger={true}
+      />
+
+      {/* 8. Custom Confirm Modal for Logout */}
+      <ConfirmModal
+        isOpen={isLogoutConfirmOpen}
+        onClose={() => setIsLogoutConfirmOpen(false)}
+        onConfirm={() => signOut(auth)}
+        title="Tizimdan Chiqish"
+        message="Haqiqatan ham o'qituvchilar panelidan chiqmoqchimisiz?"
+        confirmLabel="Ha, chiqish"
         cancelLabel="Bekor qilish"
         isDanger={true}
       />
