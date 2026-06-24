@@ -145,3 +145,86 @@ body {
   text-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
 }
 
+/* LIGHT THEME BOOTSTRAP OVERRIDES */
+html.light, html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  background-image: none !important;
+}
+
+html.light .bg-\[\#0c0e14\],
+html.light .bg-\[\#0d1017\],
+html.light .bg-\[\#090b0f\],
+html.light .bg-\[\#0e1118\],
+html.light .bg-\[\#0a0d14\],
+html.light .bg-white\/5,
+html.light .bg-[#0d1017],
+html.light .bg-[#090b0f],
+html.light .bg-[#0c0e14],
+html.light .bg-[#0c0f16],
+html.light .bg-[#090b0f],
+html.light .bg-[#0d1017],
+html.light .bg-[#0a0d14],
+html.light .bg-white\/\[0\.02\],
+html.light .bg-[#1d0d10]\/40,
+html.light .bg-slate-900\/50,
+html.light .bg-white\/10 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.light .glass-panel {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .text-white,
+html.light .text-slate-100,
+html.light .text-slate-200 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-300,
+html.light .text-slate-350,
+html.light .text-slate-355,
+html.light .text-slate-400 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-500,
+html.light .text-slate-455,
+html.light .text-slate-600 {
+  color: #64748b !important;
+}
+
+html.light .border-white\/5,
+html.light .border-white\/10,
+html.light .border-white\/20,
+html.light .border-white\/\[0\.04\] {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light .sidebar-smooth-transition button[title] {
+  color: #334155 !important;
+}
+
+html.light .sidebar-smooth-transition button[title]:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  color: #0f172a !important;
+}
+
+

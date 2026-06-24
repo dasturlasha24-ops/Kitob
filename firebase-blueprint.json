@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "ReadingLog": {
+      "title": "ReadingLog",
+      "description": "Individual book reading log for a student",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the reading log"
+        },
+        "bookTitle": {
+          "type": "string",
+          "description": "Title of the read book"
+        },
+        "pages": {
+          "type": "integer",
+          "description": "Number of pages read (each page is equal to 1 point)"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of when the log was recorded"
+        }
+      },
+      "required": ["id", "bookTitle", "pages", "date"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A student participating in the Kitobxon program",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the student"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the student"
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the student"
+        },
+        "grade": {
+          "type": "string",
+          "description": "School grade. E.g., '5-sinf', '6-sinf', etc."
+        },
+        "totalPoints": {
+          "type": "integer",
+          "description": "Total pages read overall"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of creation"
+        },
+        "readingLogs": {
+          "type": "array",
+          "description": "List of all reading logs for this student"
+        }
+      },
+      "required": ["id", "firstName", "lastName", "grade", "totalPoints", "createdAt", "readingLogs"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Collection of kitobxon students"
+    }
+  }
+}

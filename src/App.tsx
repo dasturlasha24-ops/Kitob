@@ -7,6 +7,9 @@ import { motion, AnimatePresence } from "motion/react";
 
 import { Student } from "./types";
 import { GRADES, INITIAL_STUDENTS } from "./data/mockData";
+import { db, auth, handleFirestoreError, OperationType } from "./firebase";
+import { collection, onSnapshot, query, orderBy, setDoc, doc, deleteDoc, writeBatch, getDocs } from "firebase/firestore";
+import { onAuthStateChanged, User } from "firebase/auth";
 import Sidebar from "./components/Sidebar";
 import ClassDetailView from "./components/ClassDetailView";
 import LeadershipSection from "./components/LeadershipSection";
@@ -14,10 +17,14 @@ import AddStudentModal from "./components/AddStudentModal";
 import SuccessPopup from "./components/SuccessPopup";
 import LogSuccessPopup from "./components/LogSuccessPopup";
 import ConfirmModal from "./components/ConfirmModal";
+import Login from "./components/Login";
+
+// New modules
+import SettingsSection from "./components/SettingsSection";
 
 export default function App() {
   // State for active menu section
-  const [activeTab, setActiveTab] = useState<"students" | "rating">("students");
+  const [activeTab, setActiveTab] = useState<"students" | "rating" | "settings">("students");
   
   // State for showing the mobile sidebar trigger
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -58,10 +65,58 @@ export default function App() {
   // State to control reset confirmation modal
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
-  // Persist students to localStorage anytime the state is modified
+  // Authentication states
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Synchronise Firebase Auth State
   useEffect(() => {
-    localStorage.setItem("zukko_kitobxon_students", JSON.stringify(students));
-  }, [students]);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Synchronise with Firestore Database in Real-Time
+  useEffect(() => {
+    const q = query(collection(db, "students"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      if (snapshot.empty && !localStorage.getItem("zukko_cleared")) {
+        try {
+          const batch = writeBatch(db);
+          INITIAL_STUDENTS.forEach((student) => {
+            const docRef = doc(db, "students", student.id);
+            batch.set(docRef, student);
+          });
+          await batch.commit();
+          return;
+        } catch (error) {
+          console.error("Error seeding initial students to Firestore:", error);
+        }
+      }
+
+      const list: Student[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() } as Student);
+      });
+      setStudents(list);
+      localStorage.setItem("zukko_kitobxon_students", JSON.stringify(list));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, "students");
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Synchronise Theme setting on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("zukko_library_theme") || "dark";
+    if (savedTheme === "light") {
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+    }
+  }, []);
 
   // Aggregate stats
   const totalStudentsCount = students.length;
@@ -80,10 +135,11 @@ export default function App() {
     };
   };
 
-  // Handler to add a new student dynamically
-  const handleAddStudent = (firstName: string, lastName: string, grade: string) => {
+  // Handler to add a new student dynamically in Firestore
+  const handleAddStudent = async (firstName: string, lastName: string, grade: string) => {
+    const studentId = `stud-${Date.now()}`;
     const newStudent: Student = {
-      id: `stud-${Date.now()}`,
+      id: studentId,
       firstName,
       lastName,
       grade,
@@ -92,49 +148,72 @@ export default function App() {
       readingLogs: []
     };
 
-    setStudents(prev => [newStudent, ...prev]);
-    
-    // Set parameters for success popup and trigger it
-    setRecentAddedStudentName(`${firstName} ${lastName}`);
-    setRecentAddedStudentGrade(grade);
-    setIsSuccessPopupOpen(true);
-  };
-
-  // Handler to log reading records for a student
-  const handleAddReadingLog = (studentId: string, bookTitle: string, pages: number) => {
-    const targetStudent = students.find(s => s.id === studentId);
-    if (targetStudent) {
-      setRecentLogStudentName(`${targetStudent.firstName} ${targetStudent.lastName}`);
-      setRecentLogBookTitle(bookTitle);
-      setRecentLogPages(pages);
-      setIsLogSuccessPopupOpen(true);
+    try {
+      await setDoc(doc(db, "students", studentId), newStudent);
+      
+      // Set parameters for success popup and trigger it
+      setRecentAddedStudentName(`${firstName} ${lastName}`);
+      setRecentAddedStudentGrade(grade);
+      setIsSuccessPopupOpen(true);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `students/${studentId}`);
     }
-
-    setStudents(prevStudents => prevStudents.map(student => {
-      if (student.id === studentId) {
-        const newLog = {
-          id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          bookTitle,
-          pages,
-          date: new Date().toISOString()
-        };
-        const updatedLogs = [newLog, ...student.readingLogs];
-        const newTotalPoints = student.totalPoints + pages;
-        
-        return {
-          ...student,
-          readingLogs: updatedLogs,
-          totalPoints: newTotalPoints
-        };
-      }
-      return student;
-    }));
   };
 
-  // Handler to delete a student if necessary
-  const handleDeleteStudent = (studentId: string) => {
-    setStudents(prev => prev.filter(st => st.id !== studentId));
+  // Handler to log reading records for a student in Firestore
+  const handleAddReadingLog = async (studentId: string, bookTitle: string, pages: number) => {
+    const targetStudent = students.find(s => s.id === studentId);
+    if (!targetStudent) return;
+
+    setRecentLogStudentName(`${targetStudent.firstName} ${targetStudent.lastName}`);
+    setRecentLogBookTitle(bookTitle);
+    setRecentLogPages(pages);
+    setIsLogSuccessPopupOpen(true);
+
+    const newLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      bookTitle,
+      pages,
+      date: new Date().toISOString()
+    };
+    const updatedLogs = [newLog, ...targetStudent.readingLogs];
+    const newTotalPoints = targetStudent.totalPoints + pages;
+
+    try {
+      await setDoc(doc(db, "students", studentId), {
+        ...targetStudent,
+        readingLogs: updatedLogs,
+        totalPoints: newTotalPoints
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `students/${studentId}`);
+    }
   };
+
+  // Handler to delete a student from Firestore
+  const handleDeleteStudent = async (studentId: string) => {
+    try {
+      await deleteDoc(doc(db, "students", studentId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `students/${studentId}`);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#07090e] text-slate-100 space-y-4 font-sans relative overflow-hidden">
+        {/* Ambient background glow */}
+        <div className="absolute inset-0 bg-[radial-gradient(#ffffff03_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin relative z-10" />
+        <span className="text-xs text-slate-500 font-mono tracking-wider uppercase relative z-10 animate-pulse">Tizim yuklanmoqda...</span>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
 
   return (
     <div id="app_root" className="min-h-screen flex flex-col lg:flex-row bg-[#0c0e14] text-slate-100 relative overflow-hidden font-sans">
@@ -345,6 +424,13 @@ export default function App() {
           </div>
         )}
 
+        {/* TAB 6: SETTINGS & VERSION MANAGEMENT */}
+        {activeTab === "settings" && (
+          <div id="settings_tab" className="animate-fade-in duration-300">
+            <SettingsSection />
+          </div>
+        )}
+
       </main>
 
       {/* 4. Smooth Animated Global Modal: Yangi o'quvchi qo'shish */}
@@ -392,9 +478,19 @@ export default function App() {
       <ConfirmModal
         isOpen={isResetConfirmOpen}
         onClose={() => setIsResetConfirmOpen(false)}
-        onConfirm={() => {
-          setStudents([]);
-          localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
+        onConfirm={async () => {
+          setIsResetConfirmOpen(false);
+          localStorage.setItem("zukko_cleared", "true");
+          try {
+            const batch = writeBatch(db);
+            const querySnapshot = await getDocs(collection(db, "students"));
+            querySnapshot.forEach((doc) => {
+              batch.delete(doc.ref);
+            });
+            await batch.commit();
+          } catch (error) {
+            handleFirestoreError(error, OperationType.DELETE, "students");
+          }
         }}
         title="Ma'lumotlarni Tozalash"
         message="Siz haqiqatan ham barcha o'quvchilar va ularning kiritilgan kitobxonlik natijalarini o'chirib, loyihani toza holatga keltirmoqchimisiz? Ushbu amalni ortga qaytarib bo'lmaydi!"

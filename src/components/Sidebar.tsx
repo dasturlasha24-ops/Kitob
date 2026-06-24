@@ -1,8 +1,10 @@
-import { BookOpen, Award, Users, Trophy, Flame } from "lucide-react";
+import { BookOpen, Award, Users, Trophy, Flame, Settings, LogOut } from "lucide-react";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
 
 interface SidebarProps {
-  activeTab: "students" | "rating";
-  setActiveTab: (tab: "students" | "rating") => void;
+  activeTab: "students" | "rating" | "settings";
+  setActiveTab: (tab: "students" | "rating" | "settings") => void;
   totalStudentsCount: number;
   totalPagesRead: number;
   topStudentName?: string;
@@ -37,7 +39,7 @@ export default function Sidebar({
       </div>
 
       {/* Navigation tabs */}
-      <nav className="flex-1 px-3 py-6 space-y-2">
+      <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto no-scrollbar">
         <p className={`px-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest font-mono sidebar-smooth-transition overflow-hidden whitespace-nowrap ${isHovered ? "lg:opacity-100 lg:h-4 lg:scale-100" : "lg:opacity-0 lg:h-0 lg:scale-95"}`}>
           Asosiy Bo'limlar
         </p>
@@ -45,7 +47,7 @@ export default function Sidebar({
         {/* O'quvchilar Section Button */}
         <button
           onClick={() => setActiveTab("students")}
-          className={`w-full flex items-center justify-between px-3.5 py-3.5 rounded-2xl sidebar-smooth-transition outline-none cursor-pointer ${
+          className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl sidebar-smooth-transition outline-none cursor-pointer ${
             activeTab === "students"
               ? "bg-white/10 text-white border border-white/10 font-semibold shadow-lg"
               : "text-slate-400 hover:text-slate-100 hover:bg-white/5"
@@ -59,9 +61,9 @@ export default function Sidebar({
             </span>
           </div>
           <span
-            className={`text-xs px-2 py-0.5 rounded-full font-mono sidebar-smooth-transition whitespace-nowrap overflow-hidden ${
-              activeTab === "students" ? "bg-white/20 text-white" : "bg-white/5 text-slate-500"
-            } ${isHovered ? "lg:opacity-100 lg:scale-100 lg:w-8" : "lg:opacity-0 lg:scale-0 lg:w-0"}`}
+            className={`text-[10px] px-2 py-0.5 rounded-md font-mono sidebar-smooth-transition whitespace-nowrap overflow-hidden ${
+              activeTab === "students" ? "bg-blue-500/20 text-blue-400 font-bold" : "bg-white/5 text-slate-500"
+            } ${isHovered ? "lg:opacity-100 lg:scale-100 lg:w-fit" : "lg:opacity-0 lg:scale-0 lg:w-0 lg:p-0"}`}
           >
             5-11
           </span>
@@ -70,7 +72,7 @@ export default function Sidebar({
         {/* Reyting Section Button */}
         <button
           onClick={() => setActiveTab("rating")}
-          className={`w-full flex items-center justify-between px-3.5 py-3.5 rounded-2xl sidebar-smooth-transition outline-none cursor-pointer ${
+          className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl sidebar-smooth-transition outline-none cursor-pointer ${
             activeTab === "rating"
               ? "bg-white/10 text-white border border-white/10 font-semibold shadow-lg"
               : "text-slate-400 hover:text-slate-100 hover:bg-white/5"
@@ -78,18 +80,61 @@ export default function Sidebar({
           title="Chempionlar reyting jurnali"
         >
           <div className="flex items-center gap-3">
-            <Trophy className={`w-5 h-5 shrink-0 ${activeTab === "rating" ? "text-yellow-400" : "text-slate-400"}`} />
+            <Trophy className={`w-5 h-5 shrink-0 ${activeTab === "rating" ? "text-emerald-400 animate-pulse" : "text-slate-400"}`} />
             <span className={`font-display sidebar-smooth-transition whitespace-nowrap overflow-hidden ${isHovered ? "lg:opacity-100 lg:w-36 lg:translate-x-0" : "lg:opacity-0 lg:w-0 lg:-translate-x-4"}`}>
               Reyting & Statlar
             </span>
           </div>
           <span
-            className={`text-xs px-2 py-0.5 rounded-full font-mono sidebar-smooth-transition whitespace-nowrap overflow-hidden ${
-              activeTab === "rating" ? "bg-white/20 text-white" : "bg-white/5 text-slate-500"
-            } ${isHovered ? "lg:opacity-100 lg:scale-100 lg:w-8" : "lg:opacity-0 lg:scale-0 lg:w-0"}`}
+            className={`text-[10px] px-2 py-0.5 rounded-md font-mono sidebar-smooth-transition whitespace-nowrap overflow-hidden ${
+              activeTab === "rating" ? "bg-emerald-500/20 text-emerald-400 font-bold" : "bg-white/5 text-slate-500"
+            } ${isHovered ? "lg:opacity-100 lg:scale-100 lg:w-fit" : "lg:opacity-0 lg:scale-0 lg:w-0 lg:p-0"}`}
           >
             TOP
           </span>
+        </button>
+
+        {/* Sozlamalar Section Button */}
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl sidebar-smooth-transition outline-none cursor-pointer ${
+            activeTab === "settings"
+              ? "bg-white/10 text-white border border-white/10 font-semibold shadow-lg"
+              : "text-slate-400 hover:text-slate-100 hover:bg-white/5"
+          }`}
+          title="Tizim sozlamalari va versiya boshqaruvi"
+        >
+          <div className="flex items-center gap-3">
+            <Settings className={`w-5 h-5 shrink-0 ${activeTab === "settings" ? "text-indigo-400 animate-spin" : "text-slate-400"}`} style={{ animationDuration: activeTab === "settings" ? '12s' : '0s' }} />
+            <span className={`font-display sidebar-smooth-transition whitespace-nowrap overflow-hidden ${isHovered ? "lg:opacity-100 lg:w-28 lg:translate-x-0" : "lg:opacity-0 lg:w-0 lg:-translate-x-4"}`}>
+              Sozlamalar
+            </span>
+          </div>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-md font-mono sidebar-smooth-transition whitespace-nowrap overflow-hidden ${
+              activeTab === "settings" ? "bg-indigo-500/20 text-indigo-455 font-bold" : "bg-white/5 text-slate-500"
+            } ${isHovered ? "lg:opacity-100 lg:scale-100 lg:w-fit" : "lg:opacity-0 lg:scale-0 lg:w-0 lg:p-0"}`}
+          >
+            v1.1
+          </span>
+        </button>
+
+        {/* Chiqish (Logout) Button */}
+        <button
+          onClick={() => {
+            if (window.confirm("Tizimdan chiqishni xohlaysizmi?")) {
+              signOut(auth);
+            }
+          }}
+          className="w-full flex items-center justify-between px-3.5 py-3 rounded-2xl sidebar-smooth-transition outline-none cursor-pointer text-slate-400 hover:text-rose-450 hover:bg-rose-500/10 group"
+          title="Tizimdan Chiqish"
+        >
+          <div className="flex items-center gap-3">
+            <LogOut className="w-5 h-5 shrink-0 text-slate-400 group-hover:text-rose-450" />
+            <span className={`font-display sidebar-smooth-transition whitespace-nowrap overflow-hidden ${isHovered ? "lg:opacity-100 lg:w-28 lg:translate-x-0" : "lg:opacity-0 lg:w-0 lg:-translate-x-4"}`}>
+              Chiqish
+            </span>
+          </div>
         </button>
       </nav>
 
