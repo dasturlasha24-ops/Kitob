@@ -1,9 +1,7 @@
 import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "motion/react";
 import { 
-  Trophy, Medal, Search, BookOpen, 
-  Sparkles, TrendingUp, GraduationCap, Download,
-  Crown, Zap, TrendingDown, Award
+  Trophy, Search, BookOpen, 
+  Download, X, LayoutGrid, List
 } from "lucide-react";
 import { Student } from "../types";
 import { GRADES } from "../data/mockData";
@@ -12,552 +10,671 @@ interface LeadershipSectionProps {
   students: Student[];
 }
 
-// Simple level title helper based on points
-function getReadingLevel(points: number) {
-  if (points >= 1000) return { title: "Mutolaa Qiroli", color: "text-rose-400" };
-  if (points >= 500) return { title: "Zukko Olim", color: "text-amber-400" };
-  if (points >= 300) return { title: "Mutolaa Ustasi", color: "text-indigo-400" };
-  if (points >= 100) return { title: "G'uncha Kitobxon", color: "text-emerald-400" };
-  return { title: "Kashfiyetchi", color: "text-slate-400" };
+export type ZoneType = "green" | "yellow" | "red";
+
+export interface ZoneStyle {
+  type: ZoneType;
+  name: string;
+  badgeLabel: string;
+  textColor: string;
+  badgeBg: string;
+  badgeText: string;
+  badgeBorder: string;
+  dotColor: string;
+  cardBorder: string;
+  rowHighlight: string;
+}
+
+function formatGrade(grade: string): string {
+  if (!grade) return "";
+  return grade.endsWith("-sinf") ? grade : `${grade}-sinf`;
+}
+
+export function getStudentZone(rank: number, total: number, points: number): ZoneStyle {
+  const greenCutoff = Math.max(3, Math.ceil(total * 0.3));
+  const yellowCutoff = Math.max(greenCutoff + 1, Math.ceil(total * 0.7));
+
+  if (rank <= greenCutoff && points > 0) {
+    return {
+      type: "green",
+      name: "Yashil zona",
+      badgeLabel: "Peshqadam",
+      textColor: "text-emerald-600",
+      badgeBg: "bg-emerald-50",
+      badgeText: "text-emerald-700",
+      badgeBorder: "border-emerald-200",
+      dotColor: "bg-emerald-500",
+      cardBorder: "border-emerald-200 hover:border-emerald-400 bg-white",
+      rowHighlight: "hover:bg-emerald-50/40",
+    };
+  } else if (rank <= yellowCutoff && points > 0) {
+    return {
+      type: "yellow",
+      name: "Sariq zona",
+      badgeLabel: "O'rtacha",
+      textColor: "text-amber-600",
+      badgeBg: "bg-amber-50",
+      badgeText: "text-amber-700",
+      badgeBorder: "border-amber-200",
+      dotColor: "bg-amber-500",
+      cardBorder: "border-amber-200 hover:border-amber-400 bg-white",
+      rowHighlight: "hover:bg-amber-50/40",
+    };
+  } else {
+    return {
+      type: "red",
+      name: "Qizil zona",
+      badgeLabel: "Harakat kerak",
+      textColor: "text-rose-600",
+      badgeBg: "bg-rose-50",
+      badgeText: "text-rose-700",
+      badgeBorder: "border-rose-200",
+      dotColor: "bg-rose-500",
+      cardBorder: "border-rose-200 hover:border-rose-400 bg-white",
+      rowHighlight: "hover:bg-rose-50/40",
+    };
+  }
 }
 
 export default function LeadershipSection({ students }: LeadershipSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGradeFilter, setSelectedGradeFilter] = useState("all");
+  const [selectedZoneFilter, setSelectedZoneFilter] = useState<"all" | ZoneType>("all");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
-  // Calculate sorted list overall
+  // Sorted list descending by totalPoints
   const sortedAllStudents = useMemo(() => {
     return [...students].sort((a, b) => b.totalPoints - a.totalPoints);
   }, [students]);
 
-  // Aggregate stats per Grade for class competition
-  const gradeAnalytics = useMemo(() => {
-    const map: Record<string, { totalPages: number; studentCount: number }> = {};
-    GRADES.forEach(g => {
-      map[g] = { totalPages: 0, studentCount: 0 };
+  // Grade filtered list
+  const gradeFilteredList = useMemo(() => {
+    return sortedAllStudents.filter((student) => {
+      return selectedGradeFilter === "all" || student.grade === selectedGradeFilter;
+    });
+  }, [sortedAllStudents, selectedGradeFilter]);
+
+  // Students with zone & rank
+  const studentsWithZones = useMemo(() => {
+    const total = gradeFilteredList.length;
+    return gradeFilteredList.map((st, index) => {
+      const rank = index + 1;
+      const zone = getStudentZone(rank, total, st.totalPoints);
+      return {
+        ...st,
+        rank,
+        zone
+      };
+    });
+  }, [gradeFilteredList]);
+
+  // Zone statistics
+  const zoneStats = useMemo(() => {
+    let green = 0;
+    let yellow = 0;
+    let red = 0;
+
+    studentsWithZones.forEach((s) => {
+      if (s.zone.type === "green") green++;
+      else if (s.zone.type === "yellow") yellow++;
+      else if (s.zone.type === "red") red++;
     });
 
-    students.forEach(st => {
-      if (map[st.grade]) {
-        map[st.grade].totalPages += st.totalPoints;
-        map[st.grade].studentCount += 1;
-      }
+    return { green, yellow, red, total: studentsWithZones.length };
+  }, [studentsWithZones]);
+
+  // Displayed students after search & zone filter
+  const displayedStudents = useMemo(() => {
+    return studentsWithZones.filter((st) => {
+      const fullName = `${st.firstName} ${st.lastName}`.toLowerCase();
+      const matchesSearch = !searchQuery.trim() || fullName.includes(searchQuery.toLowerCase().trim());
+      const matchesZone = selectedZoneFilter === "all" || st.zone.type === selectedZoneFilter;
+      return matchesSearch && matchesZone;
     });
+  }, [studentsWithZones, searchQuery, selectedZoneFilter]);
 
-    return Object.entries(map)
-      .map(([grade, data]) => ({
-        grade,
-        totalPages: data.totalPages,
-        studentCount: data.studentCount,
-        avgPages: data.studentCount > 0 ? Math.round(data.totalPages / data.studentCount) : 0
-      }))
-      .filter(g => g.totalPages > 0)
-      .sort((a, b) => b.totalPages - a.totalPages);
-  }, [students]);
-
-  const maxClassPages = useMemo(() => {
-    const pages = gradeAnalytics.map(g => g.totalPages);
-    return Math.max(...pages, 100);
-  }, [gradeAnalytics]);
-
-  // Filter students
-  const filteredStudents = useMemo(() => {
-    return sortedAllStudents.filter(student => {
-      const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
-      const matchesSearch = fullName.includes(searchQuery.toLowerCase());
-      const matchesGrade = selectedGradeFilter === "all" || student.grade === selectedGradeFilter;
-      return matchesSearch && matchesGrade;
-    });
-  }, [sortedAllStudents, searchQuery, selectedGradeFilter]);
-
-  // Podium Positions (1st, 2nd, 3rd)
-  const podium = useMemo(() => {
-    return sortedAllStudents.slice(0, 3);
-  }, [sortedAllStudents]);
-
-  const downloadLeaderboardCSV = () => {
-    // Generate beautiful spreadsheet with premium colors and styles
-    const sheetName = selectedGradeFilter === "all" ? "Barcha sinflar reytingi" : `${selectedGradeFilter}-sinf reytingi`;
+  // Export to Excel
+  const downloadLeaderboardExcel = () => {
     let tableRows = "";
-    
-    filteredStudents.forEach((st, i) => {
-      const isOdd = i % 2 === 1;
-      let rankStyle = "";
-      let medal = "";
-      
-      if (i === 0) {
-        rankStyle = "style='background-color: #fefaa6; color: #854d0e; font-weight: bold; font-size: 14px;'";
-        medal = " 🥇";
-      } else if (i === 1) {
-        rankStyle = "style='background-color: #f1f5f9; color: #475569; font-weight: bold; font-size: 13px;'";
-        medal = " 🥈";
-      } else if (i === 2) {
-        rankStyle = "style='background-color: #ffedd5; color: #c2410c; font-weight: bold; font-size: 13px;'";
-        medal = " 🥉";
-      } else {
-        rankStyle = isOdd ? "style='background-color: #f8fafc;'" : "";
-      }
+    displayedStudents.forEach((st) => {
+      const isOdd = st.rank % 2 === 1;
+      let medal = st.rank === 1 ? " 🥇 (1-o'rin)" : st.rank === 2 ? " 🥈 (2-o'rin)" : st.rank === 3 ? " 🥉 (3-o'rin)" : "";
+      let zoneColor = st.zone.type === "green" ? "#059669" : st.zone.type === "yellow" ? "#d97706" : "#e11d48";
 
-      const level = getReadingLevel(st.totalPoints).title;
-      
       tableRows += `
-        <tr ${isOdd && i > 2 ? "style='background-color: #f8fafc;'" : ""}>
-          <td align="center" ${rankStyle}>${i + 1}${medal}</td>
-          <td style="font-weight: 500; font-size: 13px; color: #0f172a;">${st.firstName} ${st.lastName}</td>
-          <td align="center" style="font-weight: 550;">${st.grade}</td>
-          <td align="center" style="color: #6366f1; font-weight: bold;">${level}</td>
-          <td align="center" style="color: #0284c7; font-weight: bold;">${st.readingLogs.length} ta kitob</td>
-          <td align="center" style="color: #10b981; font-weight: bold; font-size: 13px;">${st.totalPoints} bet</td>
+        <tr ${isOdd && st.rank > 3 ? "style='background-color: #f8fafc;'" : ""}>
+          <td align="center" style="font-weight: bold;">${st.rank}${medal}</td>
+          <td style="font-weight: 600;">${st.firstName} ${st.lastName}</td>
+          <td align="center">${formatGrade(st.grade)}</td>
+          <td align="center" style="color: ${zoneColor}; font-weight: bold;">${st.zone.name} (${st.zone.badgeLabel})</td>
+          <td align="center">${st.readingLogs.length} ta kitob</td>
+          <td align="center" style="font-weight: bold; color: ${zoneColor}; font-size: 13px;">${st.totalPoints} bet</td>
         </tr>
       `;
     });
-
-    const totalBooks = filteredStudents.reduce((sum, st) => sum + st.readingLogs.length, 0);
-    const totalPages = filteredStudents.reduce((sum, st) => sum + st.totalPoints, 0);
 
     const excelTemplate = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
         <meta charset="utf-8">
-        <!--[if gte mso 9]>
-        <xml>
-          <x:ExcelWorkbook>
-            <x:ExcelWorksheets>
-              <x:ExcelWorksheet>
-                <x:Name>${sheetName.substring(0, 30)}</x:Name>
-                <x:WorksheetOptions>
-                  <x:DisplayGridlines/>
-                </x:WorksheetOptions>
-              </x:ExcelWorksheet>
-            </x:ExcelWorksheets>
-          </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
         <style>
-          table { border-collapse: collapse; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-          th { background-color: #4f46e5; color: #ffffff; font-weight: bold; font-size: 13px; padding: 12px 10px; border: 1px solid #cbd5e1; text-transform: uppercase; }
-          td { padding: 10px 12px; border: 1px solid #e2e8f0; font-size: 12px; color: #334155; }
-          .meta-title { font-size: 18px; font-weight: bold; color: #1e1b4b; background-color: #f1f5f9; padding: 15px 0; }
-          .meta-label { font-weight: bold; color: #475569; background-color: #f8fafc; }
-          .meta-val { color: #0f172a; }
-          .total-row { background-color: #f5f3ff; font-weight: bold; }
+          table { border-collapse: collapse; font-family: 'Segoe UI', Arial, sans-serif; }
+          th { background-color: #0f172a; color: #ffffff; font-weight: 600; font-size: 12px; padding: 10px; border: 1px solid #cbd5e1; }
+          td { padding: 9px 12px; border: 1px solid #e2e8f0; font-size: 12px; color: #334155; }
+          .title { font-size: 16px; font-weight: bold; padding: 14px 0; background: #f8fafc; }
         </style>
       </head>
       <body>
         <table>
-          <tr>
-            <td colspan="6" class="meta-title" align="center">ZUKKO KITOBXON - PESHQADAMLAR REYTINGI</td>
-          </tr>
-          <tr>
-            <td colspan="2" class="meta-label">Sinf filtri:</td>
-            <td colspan="4" class="meta-val">${selectedGradeFilter === "all" ? "Barcha sinflar" : selectedGradeFilter}</td>
-          </tr>
-          <tr>
-            <td colspan="2" class="meta-label">Yuklangan sana:</td>
-            <td colspan="4" class="meta-val">${new Date().toLocaleString("uz-UZ")}</td>
-          </tr>
-          <tr>
-            <td colspan="2" class="meta-label">O'quvchilar soni:</td>
-            <td colspan="4" class="meta-val">${filteredStudents.length} nafar</td>
-          </tr>
-          <tr><td colspan="6" style="border: none; height: 10px;"></td></tr>
+          <tr><td colspan="6" class="title" align="center">ZUKKO KITOBXON - REYTING JADVALI</td></tr>
           <thead>
             <tr>
               <th width="80">O'rin</th>
-              <th width="200">O'quvchi ismi familiyasi</th>
-              <th width="100">Sinf</th>
-              <th width="150">Kitobxon darajasi</th>
-              <th width="150">O'qilgan kitoblar</th>
-              <th width="150">To'plangan ball (bet)</th>
+              <th width="240">O'quvchi</th>
+              <th width="90">Sinf</th>
+              <th width="160">Zona</th>
+              <th width="120">Kitoblar</th>
+              <th width="120">O'qilgan betlar</th>
             </tr>
           </thead>
           <tbody>
             ${tableRows}
-            <tr class="total-row">
-              <td colspan="4" align="right" style="padding: 12px; font-size: 13px;"><b>Jami hisoblangan ko'rsatkichlar:</b></td>
-              <td align="center" style="color: #4f46e5; font-size: 13px;"><b>${totalBooks} ta kitob</b></td>
-              <td align="center" style="color: #10b981; font-size: 13px;"><b>${totalPages} ball</b></td>
-            </tr>
           </tbody>
         </table>
       </body>
       </html>
     `;
-    
+
     const blob = new Blob([excelTemplate], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Zukko_Kitobxon_Reyting_${selectedGradeFilter === "all" ? "Barcha_sinflar" : selectedGradeFilter + "_sinf"}.xls`);
+    link.setAttribute("download", `Reyting_${selectedGradeFilter === "all" ? "Barcha_sinflar" : formatGrade(selectedGradeFilter)}.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  return (
-    <div className="space-y-10 pb-12">
-      {/* Premium minimal header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+  // Top 3 students for podium boxes
+  const top1 = displayedStudents.find((s) => s.rank === 1);
+  const top2 = displayedStudents.find((s) => s.rank === 2);
+  const top3 = displayedStudents.find((s) => s.rank === 3);
+  const hasTopThree = Boolean(top1 || top2 || top3);
+  const remainingStudents = displayedStudents.filter((s) => s.rank > 3);
+
+  // Helper to render Top 1, 2, 3 Box
+  const renderTopBox = (st: typeof studentsWithZones[0], position: "first" | "second" | "third") => {
+    const isFirst = position === "first";
+    const isSecond = position === "second";
+    const isThird = position === "third";
+
+    return (
+      <div
+        key={st.id}
+        className={`rounded-2xl p-5 sm:p-6 border bg-white flex flex-col justify-between relative overflow-hidden transition-all duration-200 ${
+          isFirst 
+            ? "border-amber-300 ring-2 ring-amber-400/40 shadow-lg md:scale-105 z-10" 
+            : isSecond 
+            ? "border-slate-300 shadow-md hover:shadow-lg" 
+            : "border-amber-200 shadow-md hover:shadow-lg"
+        }`}
+      >
+        {/* Top row: O'rin nishoni va Sinf */}
         <div>
-          <h2 className="text-2xl font-display font-medium text-white tracking-tight flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-amber-400" />
-            Peshqadamlar Reytingi
-          </h2>
-          <p className="text-slate-400 text-sm mt-1">
-            Kutubxonamiz kitobxon o'quvchilari o'rtasidagi eng yuqori natijalar
-          </p>
-        </div>
-      </div>
+          <div className="flex items-center justify-between mb-3">
+            {/* O'rin nishoni */}
+            {isFirst && (
+              <span className="px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs">
+                🥇 1-o'rin
+              </span>
+            )}
+            {isSecond && (
+              <span className="px-3 py-1 bg-slate-100 text-slate-800 border border-slate-300 rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs">
+                🥈 2-o'rin
+              </span>
+            )}
+            {isThird && (
+              <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200/90 rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs">
+                🥉 3-o'rin
+              </span>
+            )}
 
-      {/* Podium Display (Extremely clean & polished Top 3 with premium styling) */}
-      {podium.length > 0 && (
-        <div className="bg-gradient-to-b from-slate-900/40 via-[#0a0d14]/80 to-[#07090d]/95 border border-white/10 p-6 sm:p-8 rounded-3xl shadow-2xl relative overflow-hidden">
-          {/* Subtle decoration glow behind the podium */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute top-10 left-1/2 -translate-x-1/2 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="text-center mb-12 relative z-10">
-            <span className="text-xs font-mono tracking-widest text-amber-400 uppercase font-bold bg-amber-500/10 px-4 py-1.5 rounded-full border border-amber-500/20 shadow-sm">
-              🏆 Eng yuqori 3 kitobxonimiz
+            {/* Sinf */}
+            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg font-mono">
+              {formatGrade(st.grade)}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-end max-w-4xl mx-auto relative z-10">
-            
-            {/* 2nd Place */}
-            {podium[1] && (
-              <motion.div 
-                whileHover={{ y: -6, scale: 1.02 }}
-                className="order-2 md:order-1 bg-gradient-to-b from-slate-500/5 to-[#0b0e14] border border-slate-500/20 p-6 rounded-3xl text-center flex flex-col items-center hover:border-slate-400/40 transition-all shadow-xl shadow-black/40"
-              >
-                <div className="relative">
-                  {/* Outer silver ring glow */}
-                  <div className="absolute inset-0 bg-slate-400/10 rounded-full blur-md" />
-                  <div className="relative w-18 h-18 rounded-full bg-slate-400/15 flex items-center justify-center font-display font-medium text-slate-200 text-xl border-2 border-slate-400/40 ring-4 ring-slate-400/5">
-                    {podium[1].firstName[0]}
-                    {podium[1].lastName[0]}
-                  </div>
-                  <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-slate-400 text-slate-950 text-xs font-bold shadow-md shadow-slate-900/50">
-                    2
-                  </span>
-                </div>
-                
-                <h4 className="font-display font-bold text-slate-100 mt-5 truncate max-w-[170px] text-base">
-                  {podium[1].firstName} {podium[1].lastName}
-                </h4>
-                <p className="text-[11px] font-mono text-slate-400 bg-slate-500/10 px-2 py-0.5 rounded-md mt-1 w-fit">{podium[1].grade}-sinf</p>
-                
-                <div className="mt-5 bg-slate-405/[0.03] border border-slate-500/10 px-4 py-3 rounded-2xl text-center w-full shadow-inner">
-                  <div className="text-xl font-mono font-extrabold text-slate-200 flex items-center justify-center gap-1">
-                    {podium[1].totalPoints}
-                    <span className="text-xs text-slate-405 font-medium uppercase font-sans">b</span>
-                  </div>
-                  <div className="text-[10px] text-slate-455 font-mono font-bold mt-1 uppercase tracking-wider">{getReadingLevel(podium[1].totalPoints).title}</div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">{podium[1].readingLogs.length} ta kitob o'qilgan</div>
-                </div>
-              </motion.div>
-            )}
+          {/* Zona va Ball */}
+          <div className="pt-2 pb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${st.zone.badgeBg} ${st.zone.badgeText} ${st.zone.badgeBorder}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${st.zone.dotColor}`} />
+                {st.zone.name}
+              </span>
 
-            {/* 1st Place Champion (Glows Golden elegantly) */}
-            {podium[0] && (
-              <motion.div 
-                whileHover={{ y: -10, scale: 1.03 }}
-                className="order-1 md:order-2 bg-gradient-to-b from-amber-500/[0.08] via-amber-500/[0.02] to-[#0f131a] border-2 border-amber-400/50 p-8 rounded-[2rem] text-center flex flex-col items-center md:scale-105 relative overflow-hidden shadow-2xl shadow-amber-500/10"
-              >
-                {/* Crown hovering above */}
-                <div className="absolute top-2 right-2 text-amber-450 animate-bounce duration-1000">
-                  <Crown className="w-5 h-5 drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
-                </div>
-                
-                <div className="relative mt-2">
-                  {/* Golden Halo */}
-                  <div className="absolute inset-0 bg-amber-400/20 rounded-full blur-lg animate-pulse" />
-                  <div className="relative w-22 h-22 rounded-full bg-amber-400/15 flex items-center justify-center font-display font-medium text-amber-250 text-3xl border-2 border-amber-400/55 ring-8 ring-amber-400/5">
-                    {podium[0].firstName[0]}
-                    {podium[0].lastName[0]}
-                  </div>
-                  <span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-amber-950 text-sm font-black shadow-lg shadow-amber-950/80 ring-2 ring-[#0f131a]">
-                    1
-                  </span>
-                </div>
-                
-                <h4 className="font-display font-black text-amber-200 mt-6 text-lg truncate max-w-[190px] drop-shadow-sm tracking-tight">
-                  {podium[0].firstName} {podium[0].lastName}
-                </h4>
-                <p className="text-xs font-mono text-amber-400 font-bold bg-amber-550/15 px-3 py-1 rounded-md mt-1 w-fit border border-amber-450/40">
-                  👑 {podium[0].grade}-sinf
-                </p>
-                
-                <div className="mt-6 bg-amber-500/10 border border-amber-400/30 px-5 py-4 rounded-2xl text-center w-full shadow-inner">
-                  <div className="text-3xl font-mono font-black text-amber-300 flex items-center justify-center gap-1">
-                    {podium[0].totalPoints}
-                    <span className="text-sm text-amber-405 font-bold uppercase font-sans">b</span>
-                  </div>
-                  <div className="text-[11px] text-amber-400 font-bold font-mono mt-1 uppercase tracking-widest">{getReadingLevel(podium[0].totalPoints).title}</div>
-                  <div className="text-[10px] text-amber-400/60 mt-1">{podium[0].readingLogs.length} ta ulkan mutolaalar</div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* 3rd Place */}
-            {podium[2] && (
-              <motion.div 
-                whileHover={{ y: -6, scale: 1.02 }}
-                className="order-3 bg-gradient-to-b from-amber-700/5 to-[#0b0e14] border border-amber-700/20 p-6 rounded-3xl text-center flex flex-col items-center hover:border-amber-600/40 transition-all shadow-xl shadow-black/40"
-              >
-                <div className="relative">
-                  {/* Bronze halo */}
-                  <div className="absolute inset-0 bg-amber-600/10 rounded-full blur-md" />
-                  <div className="relative w-18 h-18 rounded-full bg-amber-700/15 flex items-center justify-center font-display font-medium text-amber-550 text-xl border-2 border-amber-700/40 ring-4 ring-amber-700/5">
-                    {podium[2].firstName[0]}
-                    {podium[2].lastName[0]}
-                  </div>
-                  <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-amber-700 text-amber-50 text-xs font-bold shadow-md shadow-amber-900/50">
-                    3
-                  </span>
-                </div>
-                
-                <h4 className="font-display font-bold text-slate-100 mt-5 truncate max-w-[170px] text-base">
-                  {podium[2].firstName} {podium[2].lastName}
-                </h4>
-                <p className="text-[11px] font-mono text-slate-400 bg-amber-700/10 px-2 py-0.5 rounded-md mt-1 w-fit">{podium[2].grade}-sinf</p>
-                
-                <div className="mt-5 bg-amber-700/[0.03] border border-amber-700/10 px-4 py-3 rounded-2xl text-center w-full shadow-inner">
-                  <div className="text-xl font-mono font-extrabold text-slate-200 flex items-center justify-center gap-1">
-                    {podium[2].totalPoints}
-                    <span className="text-xs text-slate-405 font-medium uppercase font-sans">b</span>
-                  </div>
-                  <div className="text-[10px] text-amber-550 font-mono font-bold mt-1 uppercase tracking-wider">{getReadingLevel(podium[2].totalPoints).title}</div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">{podium[2].readingLogs.length} ta kitob o'qilgan</div>
-                </div>
-              </motion.div>
-            )}
-
-          </div>
-        </div>
-      )}
-
-      {/* Sinf Jamoalariaro Bellashuv (Clean visual list with thin lines, no clutter) */}
-      {gradeAnalytics.length > 0 && (
-        <div className="bg-white/[0.01] border border-white/5 p-6 rounded-2xl">
-          <h3 className="text-base font-display font-medium text-white flex items-center gap-2 mb-4">
-            <TrendingUp className="w-4 h-4 text-indigo-400" />
-            Sinflararo Bellashuv (Jami o'qilgan sahifalar)
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {gradeAnalytics.map((g, idx) => {
-              const pct = maxClassPages > 0 ? (g.totalPages / maxClassPages) * 100 : 0;
-              return (
-                <div key={g.grade} className="bg-white/[0.02] border border-white/5 p-3.5 rounded-xl flex flex-col justify-between">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-medium text-slate-300 font-display flex items-center gap-1.5">
-                      <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
-                      {g.grade} sinf ({g.studentCount} o'quvchi)
-                    </span>
-                    <span className="font-mono font-semibold text-slate-205">{g.totalPages} bet</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-900 rounded-full mt-2.5 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 to-blue-400 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(pct, 3)}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Main Leaderboard Table */}
-      <div className="bg-[#0b0e14] border border-white/10 rounded-2xl overflow-hidden shadow-lg">
-        <div className="p-5 border-b border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.01]">
-          <div>
-            <h3 className="font-display font-medium text-white">O'quvchilar reyting jadvali</h3>
-            <p className="text-xs text-slate-500 mt-1">Ism va sinf bo'yicha saralash</p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Download button */}
-            <button
-              onClick={downloadLeaderboardCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all rounded-lg text-xs font-medium cursor-pointer"
-              title="Jadvaldagi barcha ma'lumotlarni Excel/CSV formatida yuklab olish"
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
-              Yuklab olish
-            </button>
-
-            {/* Class filter dropdown */}
-            <select
-              value={selectedGradeFilter}
-              onChange={(e) => setSelectedGradeFilter(e.target.value)}
-              className="px-3 py-1.5 bg-[#0f121a] border border-white/10 rounded-lg text-xs font-medium text-slate-305 outline-none"
-            >
-              <option value="all">Barcha sinflar</option>
-              {GRADES.map((g) => (
-                <option key={g} value={g}>{g}-sinf</option>
-              ))}
-            </select>
-
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Ismni qidirish..."
-                className="pl-8 pr-3 py-1.5 bg-[#0f121a] border border-white/10 rounded-lg text-xs outline-none text-white w-full sm:w-40 font-sans"
-              />
+              {/* O'qilgan betlar: yashil bo'lsa yashil, sariq bo'lsa sariq, qizil bo'lsa qizil */}
+              <div className={`text-2xl sm:text-3xl font-mono font-extrabold ${st.zone.textColor} tracking-tight`}>
+                {st.totalPoints.toLocaleString()} <span className="text-xs font-sans font-medium text-slate-400">bet</span>
+              </div>
             </div>
+
+            {/* Ism va Familiyasi */}
+            <h3 className="text-lg sm:text-xl font-display font-extrabold text-slate-900 tracking-tight mt-2 truncate">
+              {st.firstName} {st.lastName}
+            </h3>
+
+            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
+              <BookOpen className="w-3.5 h-3.5 text-slate-400" />
+              <span>{st.readingLogs.length} ta kitob o'qigan</span>
+            </p>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest bg-white/[0.01]">
-                <th className="py-3 px-4 text-center w-16">O'rin</th>
-                <th className="py-3 px-4">O'quvchi</th>
-                <th className="py-3 px-4">Sinf</th>
-                <th className="py-3 px-4">Darajasi (Unvon)</th>
-                <th className="py-3 px-4 text-center">Mutolaalar</th>
-                <th className="py-3 px-4 text-right w-36">Jami ball (bet)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 text-xs">
-              <AnimatePresence mode="popLayout">
-                {filteredStudents.length === 0 ? (
+        {/* Footer: Holati */}
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <span className="text-slate-400 font-medium">Holati:</span>
+          <span className={`font-semibold ${st.zone.textColor}`}>
+            {st.zone.badgeLabel}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="bg-white text-slate-900 rounded-3xl p-5 sm:p-8 md:p-10 shadow-2xl border border-slate-200/80 space-y-6 max-w-6xl mx-auto font-sans">
+      
+      {/* 1. Yuqori Boshqaruv Qismi: Soddalashgan, Premium oq fonda */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-amber-50 rounded-lg text-amber-600">
+              <Trophy className="w-5 h-5" />
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-display font-bold text-slate-900 tracking-tight">
+              O'quvchilar Reytingi
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Jami {displayedStudents.length} nafar o'quvchining mutolaa ballari va reytingi
+          </p>
+        </div>
+
+        {/* View Toggle va Excel Yuklash */}
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/60">
+            <button
+              onClick={() => setViewMode("cards")}
+              className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === "cards"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+              title="Kartalar ko'rinishi"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline">Kartalar</span>
+            </button>
+            <button
+              onClick={() => setViewMode("table")}
+              className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+              title="Jadval ko'rinishi"
+            >
+              <List className="w-4 h-4" />
+              <span className="hidden sm:inline">Jadval</span>
+            </button>
+          </div>
+
+          <button
+            onClick={downloadLeaderboardExcel}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white transition-all rounded-xl text-xs font-semibold cursor-pointer shadow-sm"
+            title="Excel formatida yuklab olish"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Excel yuklash</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Filtrlash va Qidiruv Bar: Yashil, Sariq, Qizil zonalar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3 bg-slate-50/80 rounded-2xl border border-slate-200/80">
+        
+        {/* Zona Filtri Tugmalari */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => setSelectedZoneFilter("all")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              selectedZoneFilter === "all"
+                ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Barchasi ({zoneStats.total})
+          </button>
+
+          <button
+            onClick={() => setSelectedZoneFilter("green")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              selectedZoneFilter === "green"
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${selectedZoneFilter === "green" ? "bg-white" : "bg-emerald-500"}`} />
+            Yashil zona ({zoneStats.green})
+          </button>
+
+          <button
+            onClick={() => setSelectedZoneFilter("yellow")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              selectedZoneFilter === "yellow"
+                ? "bg-amber-500 text-white shadow-sm"
+                : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/60"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${selectedZoneFilter === "yellow" ? "bg-white" : "bg-amber-500"}`} />
+            Sariq zona ({zoneStats.yellow})
+          </button>
+
+          <button
+            onClick={() => setSelectedZoneFilter("red")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              selectedZoneFilter === "red"
+                ? "bg-rose-600 text-white shadow-sm"
+                : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${selectedZoneFilter === "red" ? "bg-white" : "bg-rose-500"}`} />
+            Qizil zona ({zoneStats.red})
+          </button>
+        </div>
+
+        {/* Sinf Filtri va Qidiruv */}
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedGradeFilter}
+            onChange={(e) => setSelectedGradeFilter(e.target.value)}
+            className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer hover:border-slate-300 shadow-sm"
+          >
+            <option value="all">Barcha sinflar</option>
+            {GRADES.map((g) => (
+              <option key={g} value={g}>{formatGrade(g)}</option>
+            ))}
+          </select>
+
+          <div className="relative w-44 sm:w-56">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="O'quvchini qidirish..."
+              className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 focus:border-slate-400 rounded-xl text-xs text-slate-800 placeholder-slate-400 outline-none shadow-sm transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* 3. REYTING ASOSIY KO'RINISHI: TOP 3 TA BOX (2-CHAP, 1-O'RTADA, 3-O'NGDA) VA QOLGANLAR KETMA-KETLIKDA */}
+      {viewMode === "cards" && (
+        <div className="space-y-6 pt-1">
+          {displayedStudents.length === 0 ? (
+            <div className="py-16 text-center text-slate-400 text-sm bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              Hech qanday o'quvchi topilmadi. Qidiruv yoki filtrlarni tekshiring.
+            </div>
+          ) : (
+            <>
+              {/* TOP 3 BOX (FAKAT 1, 2, 3-O'RINLAR UCHUN KATTA BOXLAR) */}
+              {hasTopThree && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="text-xs font-mono font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <Trophy className="w-4 h-4 text-amber-500" />
+                      Top 3 Yetakchi O'quvchilar
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">
+                      1-o'rin o'rtada, 2-chapda, 3-o'ngda
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch pt-1">
+                    {/* 2-O'RIN (CHAPDA: desktopda 1-ustun) */}
+                    <div className="order-2 md:order-1 flex flex-col">
+                      {top2 ? (
+                        renderTopBox(top2, "second")
+                      ) : (
+                        <div className="h-full min-h-[190px] rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center p-6 text-slate-400 text-xs">
+                          <span className="font-bold text-slate-500 mb-1">🥈 2-o'rin</span>
+                          <span>Mavjud emas</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 1-O'RIN (O'RTADA: desktopda 2-ustun, balandroq va ajralib turuvchi) */}
+                    <div className="order-1 md:order-2 flex flex-col">
+                      {top1 ? (
+                        renderTopBox(top1, "first")
+                      ) : (
+                        <div className="h-full min-h-[190px] rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center p-6 text-slate-400 text-xs">
+                          <span className="font-bold text-slate-500 mb-1">🥇 1-o'rin</span>
+                          <span>Mavjud emas</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3-O'RIN (O'NGDA: desktopda 3-ustun) */}
+                    <div className="order-3 md:order-3 flex flex-col">
+                      {top3 ? (
+                        renderTopBox(top3, "third")
+                      ) : (
+                        <div className="h-full min-h-[190px] rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center p-6 text-slate-400 text-xs">
+                          <span className="font-bold text-slate-500 mb-1">🥉 3-o'rin</span>
+                          <span>Mavjud emas</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* QOLGAN O'QUVCHILAR KETMA-KETLIK RO'YXATI (4-o'rindan boshlab) */}
+              {(remainingStudents.length > 0 || !hasTopThree) && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-mono">
+                        Ketma-ketlik reytingi
+                      </h3>
+                      <span className="text-xs text-slate-500 font-medium">
+                        ({hasTopThree ? "4-o'rindan boshlab" : "barcha topilganlar"})
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">
+                      {(hasTopThree ? remainingStudents : displayedStudents).length} nafar o'quvchi
+                    </span>
+                  </div>
+
+                  <div className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white shadow-xs divide-y divide-slate-100">
+                    {(hasTopThree ? remainingStudents : displayedStudents).map((st) => (
+                      <div
+                        key={st.id}
+                        className={`px-4 sm:px-5 py-3.5 flex items-center justify-between gap-3 transition-colors ${st.zone.rowHighlight}`}
+                      >
+                        {/* Chap qism: O'rin, Ism-Familiya, Sinf, Kitoblar */}
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <span className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200/70 text-slate-700 font-mono font-bold text-xs flex items-center justify-center shrink-0">
+                            #{st.rank}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-slate-900 text-sm sm:text-base truncate">
+                                {st.firstName} {st.lastName}
+                              </span>
+                              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg font-mono shrink-0">
+                                {formatGrade(st.grade)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{st.readingLogs.length} ta kitob o'qigan</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* O'ng qism: Zona va Rangli Ball */}
+                        <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+                          {/* Zona nishoni */}
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${st.zone.badgeBg} ${st.zone.badgeText} ${st.zone.badgeBorder}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${st.zone.dotColor}`} />
+                            {st.zone.name}
+                            <span className="hidden sm:inline font-normal opacity-75">({st.zone.badgeLabel})</span>
+                          </span>
+
+                          {/* O'qilgan betlar: Qizil bo'lsa qizil, yashil bo'lsa yashil, sariq bo'lsa sariq */}
+                          <div className="text-right font-mono min-w-[70px]">
+                            <span className={`text-base sm:text-lg font-extrabold ${st.zone.textColor}`}>
+                              {st.totalPoints.toLocaleString()}
+                            </span>
+                            <span className="text-xs font-sans text-slate-400 ml-1">bet</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* 4. REYTING JADVALI KO'RINISHI (Jadval shaklida oq fonda) */}
+      {viewMode === "table" && (
+        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3.5 px-4 text-center w-20">O'rin</th>
+                  <th className="py-3.5 px-4">O'quvchi Ism-Familiyasi</th>
+                  <th className="py-3.5 px-4 text-center">Sinf</th>
+                  <th className="py-3.5 px-4">Reyting Zonasi</th>
+                  <th className="py-3.5 px-4 text-center">Kitoblar</th>
+                  <th className="py-3.5 px-4 text-right pr-6">O'qilgan betlar</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {displayedStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 italic">
-                      Hech qanday o'quvchi topilmadi.
+                    <td colSpan={6} className="py-14 text-center text-slate-400">
+                      Hech qanday o'quvchi topilmadi
                     </td>
                   </tr>
                 ) : (
-                  filteredStudents.map((st, i) => {
-                    const place = i + 1;
-                    const lvl = getReadingLevel(st.totalPoints);
-                    const totalCount = filteredStudents.length;
-
-                    // Determine tier categories
-                    const isTopTier = place <= 3;
-                    const isBottomTier = totalCount > 3 ? (place > totalCount - 3) : (totalCount > 1 && place === totalCount);
-                    const isMiddleTier = !isTopTier && !isBottomTier;
-
-                    let rowBgClass = "hover:bg-white/[0.02]";
-                    let rowBorderClass = "border-l-4 border-transparent";
-                    let badgeStyle = "";
-                    let badgeText = `#${place}`;
-                    let pointsColor = "text-indigo-300";
-                    let zoneLabel = null;
-
-                    if (isTopTier) {
-                      // Green/Emerald premium tier for top ranking students
-                      rowBgClass = "bg-[#042014]/30 hover:bg-[#042014]/60";
-                      rowBorderClass = "border-l-4 border-emerald-500/90";
-                      pointsColor = "text-emerald-400 font-extrabold font-display drop-shadow-[0_0_8px_rgba(16,185,129,0.15)]";
-                      badgeStyle = place === 1 
-                        ? "bg-amber-400 text-amber-950 border border-amber-300/30 font-black shadow-lg shadow-amber-400/10 scale-105" 
-                        : place === 2
-                        ? "bg-slate-300 text-slate-900 border border-slate-200/20 font-bold"
-                        : "bg-amber-700 text-amber-50 border border-orange-500/20 font-bold";
-                      zoneLabel = (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 shadow-inner">
-                          <Sparkles className="w-2.5 h-2.5 text-emerald-400 animate-pulse" /> Peshqadam (TOP)
-                        </span>
-                      );
-                    } else if (isBottomTier) {
-                      // Red/Rose warning or active tracking tier for bottom 3 students
-                      rowBgClass = "bg-[#200408]/30 hover:bg-[#200408]/60";
-                      rowBorderClass = "border-l-4 border-rose-500/95";
-                      pointsColor = "text-rose-400 font-extrabold font-display";
-                      badgeStyle = "bg-rose-950 text-rose-300 border border-rose-500/30 font-bold";
-                      zoneLabel = (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold bg-rose-500/15 text-rose-450 px-2 py-0.5 rounded-full border border-rose-500/20">
-                          <TrendingDown className="w-2.5 h-2.5 text-rose-400" /> Harakatda
-                        </span>
-                      );
-                    } else {
-                      // Yellow/Amber active tier for average scoring middle-class-rank students
-                      rowBgClass = "bg-[#1f1504]/20 hover:bg-[#1f1504]/40";
-                      rowBorderClass = "border-l-4 border-amber-500/70";
-                      pointsColor = "text-amber-450 font-bold font-display";
-                      badgeStyle = "bg-amber-950/80 text-amber-450 border border-amber-550/20 font-semibold";
-                      zoneLabel = (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/15">
-                          <Zap className="w-2.5 h-2.5 text-amber-450" /> Faol
-                        </span>
-                      );
-                    }
-
+                  displayedStudents.map((st) => {
                     return (
-                      <motion.tr 
+                      <tr
                         key={st.id}
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className={`${rowBgClass} ${rowBorderClass} transition-all duration-200 border-b border-white/[0.04]`}
+                        className={`transition-colors ${st.zone.rowHighlight}`}
                       >
-                        {/* Rank */}
-                        <td className="py-4 px-4 text-center font-mono font-bold text-slate-400">
-                          <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] min-w-[28px] ${badgeStyle}`}>
-                            {badgeText}
-                          </span>
-                        </td>
-
-                        {/* Name and Zone Label */}
-                        <td className="py-4 px-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <span className="font-semibold text-slate-100 text-sm">
-                              {st.firstName} {st.lastName}
+                        {/* O'rin */}
+                        <td className="py-3 px-4 text-center font-mono font-bold">
+                          {st.rank === 1 ? (
+                            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-amber-100 text-amber-800 border border-amber-300 text-xs">
+                              🥇 1
                             </span>
-                            {zoneLabel}
-                          </div>
+                          ) : st.rank === 2 ? (
+                            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-slate-200 text-slate-800 border border-slate-300 text-xs">
+                              🥈 2
+                            </span>
+                          ) : st.rank === 3 ? (
+                            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 text-xs">
+                              🥉 3
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">#{st.rank}</span>
+                          )}
                         </td>
 
-                        {/* Grade */}
-                        <td className="py-4 px-4">
-                          <span className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/5 text-slate-300 font-semibold text-[11px] font-sans">
-                            {st.grade}-sinf
+                        {/* Ism Familiyasi */}
+                        <td className="py-3 px-4">
+                          <span className="font-bold text-slate-900 text-sm">
+                            {st.firstName} {st.lastName}
                           </span>
                         </td>
 
-                        {/* Level Title */}
-                        <td className="py-4 px-4">
-                          <span className={`font-semibold tracking-wide text-xs px-2 py-0.5 rounded ${
-                            isTopTier ? "bg-emerald-555/10 text-emerald-400" :
-                            isBottomTier ? "bg-rose-555/10 text-rose-400" :
-                            "bg-amber-555/10 text-amber-405"
-                          }`}>
-                            {lvl.title}
+                        {/* Sinf */}
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 rounded-md font-semibold text-xs font-mono">
+                            {formatGrade(st.grade)}
                           </span>
                         </td>
 
-                        {/* Count of logs */}
-                        <td className="py-4 px-4 text-center font-mono text-slate-305">
-                          <span className="inline-flex items-center gap-1.5 bg-white/[0.04] px-2.5 py-1 rounded-xl text-[10px] text-slate-300 font-bold border border-white/5">
-                            <BookOpen className="w-3.5 h-3.5 text-slate-400" />
-                            {st.readingLogs.length} ta kitob
+                        {/* Zona */}
+                        <td className="py-3 px-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${st.zone.badgeBg} ${st.zone.badgeText} ${st.zone.badgeBorder}`}>
+                            <span className={`w-2 h-2 rounded-full ${st.zone.dotColor}`} />
+                            {st.zone.name}
+                            <span className="font-normal opacity-80">({st.zone.badgeLabel})</span>
                           </span>
                         </td>
 
-                        {/* Total page score */}
-                        <td className="py-4 px-4 text-right font-mono text-sm">
-                          <span className={`${pointsColor} tracking-tight`}>
-                            {st.totalPoints.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal uppercase font-sans">ball</span>
+                        {/* Kitoblar */}
+                        <td className="py-3 px-4 text-center">
+                          <span className="text-slate-600 font-medium">
+                            {st.readingLogs.length} ta
                           </span>
                         </td>
-                      </motion.tr>
+
+                        {/* O'qilgan betlar: Yashil, Sariq yoki Qizil */}
+                        <td className="py-3 px-4 text-right pr-6 font-mono">
+                          <span className={`text-base font-extrabold ${st.zone.textColor}`}>
+                            {st.totalPoints.toLocaleString()}
+                          </span>
+                          <span className="text-xs font-sans text-slate-400 ml-1">bet</span>
+                        </td>
+                      </tr>
                     );
                   })
                 )}
-              </AnimatePresence>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
+
+      {/* 5. Pastki tushuntirish paneli */}
+      <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" /> Yashil zona: Peshqadam
+          </span>
+          <span className="flex items-center gap-1.5 text-amber-800 font-medium">
+            <span className="w-2 h-2 rounded-full bg-amber-500" /> Sariq zona: O'rtacha
+          </span>
+          <span className="flex items-center gap-1.5 text-rose-700 font-medium">
+            <span className="w-2 h-2 rounded-full bg-rose-500" /> Qizil zona: Harakat kerak
+          </span>
+        </div>
+        <span className="font-mono text-slate-400">
+          Reyting o'qilgan kitob sahifalari (betlari) bo'yicha hisoblanadi
+        </span>
       </div>
+
     </div>
   );
 }

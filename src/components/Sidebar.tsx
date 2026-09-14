@@ -165,7 +165,7 @@ export default function Sidebar({
             <div className="min-w-0">
               <div className="text-[10px] text-blue-400 font-mono font-bold whitespace-nowrap">ENG FAOL</div>
               <div className="text-xs font-bold text-slate-200 truncate">{topStudentName}</div>
-              <div className="text-[10px] text-slate-400 font-mono whitespace-nowrap">{topStudentPoints} ball</div>
+              <div className="text-[10px] text-slate-400 font-mono whitespace-nowrap">{topStudentPoints.toLocaleString()} bet</div>
             </div>
           </div>
         )}

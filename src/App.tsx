@@ -85,7 +85,11 @@ export default function App() {
   useEffect(() => {
     const q = query(collection(db, "students"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-      if (snapshot.empty && !localStorage.getItem("zukko_cleared")) {
+      // Auto-seed 100 students if the collection is empty or not yet loaded with 100 test students
+      if (
+        (snapshot.empty && !localStorage.getItem("zukko_cleared")) ||
+        (!localStorage.getItem("zukko_100_students_loaded") && snapshot.size < 50 && !localStorage.getItem("zukko_cleared"))
+      ) {
         try {
           const batch = writeBatch(db);
           INITIAL_STUDENTS.forEach((student) => {
@@ -93,9 +97,10 @@ export default function App() {
             batch.set(docRef, student);
           });
           await batch.commit();
+          localStorage.setItem("zukko_100_students_loaded", "true");
           return;
         } catch (error) {
-          console.error("Error seeding initial students to Firestore:", error);
+          console.error("Error seeding 100 test students to Firestore:", error);
         }
       }
 
@@ -202,6 +207,41 @@ export default function App() {
     }
   };
 
+  // Handler to seed the 100 test students
+  const handleSeed100Students = async () => {
+    try {
+      const batch = writeBatch(db);
+      INITIAL_STUDENTS.forEach((student) => {
+        const docRef = doc(db, "students", student.id);
+        batch.set(docRef, student);
+      });
+      await batch.commit();
+      localStorage.setItem("zukko_100_students_loaded", "true");
+      localStorage.removeItem("zukko_cleared");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, "students");
+    }
+  };
+
+  // Handler to clear all students from Firestore
+  const handleClearAllStudents = async () => {
+    setIsResetConfirmOpen(false);
+    localStorage.setItem("zukko_cleared", "true");
+    localStorage.removeItem("zukko_100_students_loaded");
+    try {
+      const querySnapshot = await getDocs(collection(db, "students"));
+      const batch = writeBatch(db);
+      querySnapshot.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+      });
+      await batch.commit();
+      setStudents([]);
+      localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "students");
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#07090e] text-slate-100 space-y-4 font-sans relative overflow-hidden">
@@ -285,123 +325,108 @@ export default function App() {
         
         {/* TAB 1: O'QUVCHILAR SECTION */}
         {activeTab === "students" && (
-          <div id="students_tab" className="space-y-8">
+          <div id="students_tab" className="space-y-6">
             
             {!selectedGrade ? (
               // Case A: Render Grid of Classes (5 to 11 Grade Selection cards)
-              <div className="space-y-8">
-                {/* Hero Greeting Panel with Premium Frosted Glass */}
-                <div className="relative bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-10 overflow-hidden border border-white/10 shadow-2xl">
-                  <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
-                  <div className="absolute bottom-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mb-20" />
-
-                  <div className="relative max-w-2xl space-y-4">
-                    <span className="flex items-center gap-1.5 w-fit px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-xs font-semibold text-blue-300 font-mono tracking-wide">
-                      <Sparkles className="w-3.5 h-3.5 text-yellow-450 animate-pulse" />
-                      Yangi o'quv yili loyihasi
-                    </span>
-                    <h2 className="text-3xl sm:text-4xl font-display font-extrabold text-white tracking-tight">
-                      Kitobxon O'quvchilar Reyting Platformasi
+              <div className="space-y-6 max-w-6xl mx-auto">
+                {/* Minimalist Top Header & Stats */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-display font-semibold text-white tracking-tight">
+                      Kutubxona Jurnali
                     </h2>
-                    <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-                      Maktab kutubxonasiga moslashtirilgan ball tizimi. O'quvchilar o'qigan kitoblarining betlarini kiritib boradilar, 
-                      har bir o'qilgan sahifa 1 ball sifatida hisoblanadi va sinflararo sog'lom raqobatni shakllantiradi!
+                    <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                      5–11 sinflar o'rtasidagi kitobxonlik va mutolaa monitoringi
                     </p>
-                    <div className="pt-2 flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-blue-400 rounded-full animate-ping" />
-                          <span className="text-xs text-slate-400">5-11 sinflar o'rtasida</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <BookMarked className="w-4 h-4 text-emerald-450" />
-                          <span className="text-xs text-slate-400">1 bet = 1 ball formula</span>
-                        </div>
-                      </div>
+                  </div>
 
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {students.length > 0 && (
                       <button
                         onClick={() => setIsResetConfirmOpen(true)}
-                        className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 hover:text-rose-400 border border-rose-500/20 text-[11px] font-medium font-sans rounded-xl transition-all duration-200 cursor-pointer shadow-md shadow-rose-950/10"
-                        title="Barcha kiritilgan o'quvchilarni o'chirish va toza holatga qaytarish"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 rounded-xl text-xs font-medium transition-all cursor-pointer"
+                        title="Barcha o'quvchilarni o'chirish (tozalash)"
                       >
-                        Ma'lumotlarni Tozalash (Reset)
+                        O'chirish (Tozalash)
                       </button>
-                    </div>
+                    )}
+                    <button
+                      onClick={handleSeed100Students}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 rounded-xl text-xs font-medium transition-all cursor-pointer"
+                      title="100 ta sinov o'quvchisini yuklash"
+                    >
+                      100 ta o'quvchini yuklash
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedGrade(null);
+                        setIsAddModalOpen(true);
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md transition-all cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      O'quvchi qo'shish
+                    </button>
                   </div>
                 </div>
 
-                {/* Grid header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-xl font-display font-bold text-white">Sinflarni Tanlang</h3>
-                    <p className="text-slate-400 text-sm mt-0.5">Sinf o'quvchilari va jurnali bilan tanishish uchun kerakli sinf ustiga bosing</p>
+                {/* 3 Minimal Stat Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-4 bg-[#0e1118] border border-white/[0.07] rounded-2xl">
+                    <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block">Jami O'quvchilar</span>
+                    <span className="text-xl font-mono font-bold text-white mt-1 block">{totalStudentsCount} nafar</span>
                   </div>
-                  
-                  <button
-                    onClick={() => {
-                      setSelectedGrade(null); // No pre-selection
-                      setIsAddModalOpen(true);
-                    }}
-                    className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-2xl shadow-lg shadow-blue-600/20 cursor-pointer transition-all font-display duration-200"
-                  >
-                    <Plus className="w-5 h-5" />
-                    O'quvchi qo'shish
-                  </button>
+                  <div className="p-4 bg-[#0e1118] border border-white/[0.07] rounded-2xl">
+                    <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block">Jami Mutolaa</span>
+                    <span className="text-xl font-mono font-bold text-indigo-400 mt-1 block">{totalPagesRead.toLocaleString()} bet</span>
+                  </div>
+                  <div className="p-4 bg-[#0e1118] border border-white/[0.07] rounded-2xl">
+                    <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block">Yetakchi Kitobxon</span>
+                    <span className="text-sm font-semibold text-amber-300 mt-1.5 block truncate">
+                      {topStudent ? `${topStudent.firstName} ${topStudent.lastName} (${topStudent.totalPoints.toLocaleString()} bet)` : "—"}
+                    </span>
+                  </div>
                 </div>
 
-                {/* The 5-11 Classes Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Section Title */}
+                <div className="pt-2">
+                  <h3 className="text-sm font-semibold text-slate-300">Sinfni tanlang</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">O'quvchilar ro'yxati va yangi kitob kiritish uchun sinf kartasini bosing</p>
+                </div>
+
+                {/* The 5-11 Classes Grid - Minimal & Aesthetic */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {GRADES.map((gradeName) => {
                     const stats = getGradeSummaryStats(gradeName);
                     
                     return (
-                      <motion.div
+                      <div
                         key={gradeName}
-                        whileHover={{ y: -4, scale: 1.01 }}
-                        transition={{ duration: 0.2 }}
                         onClick={() => setSelectedGrade(gradeName)}
-                        className="bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-6 shadow-xl hover:bg-white/10 transition-all cursor-pointer flex flex-col justify-between h-48 group relative overflow-hidden text-slate-200"
+                        className="bg-[#0e1118] hover:bg-[#121620] border border-white/[0.07] hover:border-indigo-500/40 rounded-2xl p-5 transition-all cursor-pointer group flex flex-col justify-between h-40"
                       >
-                        {/* Decorative subtle visual top bar change on hover */}
-                        <span className="absolute top-0 left-0 right-0 h-1.5 bg-white/5 group-hover:bg-blue-500 transition-colors" />
-
-                        <div className="flex justify-between items-start">
-                          <div className="space-y-1">
-                            <div className="p-2.5 bg-white/5 text-blue-400 rounded-2xl w-fit group-hover:bg-blue-600 group-hover:text-white transition-colors duration-250">
-                              <GraduationCap className="w-5 h-5" />
-                            </div>
-                            <h4 className="text-xl font-display font-bold text-white pt-2 tracking-tight">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">Sinf</span>
+                            <h4 className="text-xl font-display font-bold text-white mt-0.5 group-hover:text-indigo-300 transition-colors">
                               {gradeName}
                             </h4>
                           </div>
-
-                          <span className="p-1 px-2.5 bg-white/5 border border-white/10 text-[10px] text-slate-400 font-bold font-mono rounded-lg uppercase tracking-wider">
-                            Sinf
-                          </span>
-                        </div>
-
-                        {/* Stats Summary Panel */}
-                        <div className="flex items-end justify-between pt-4 border-t border-white/5">
-                          <div className="space-y-0.5">
-                            <p className="text-xs text-slate-500 font-mono">Batafsil ma'lumot</p>
-                            <div className="flex items-center gap-3 text-sm">
-                              <span className="font-semibold text-slate-300 flex items-center gap-1">
-                                <Users className="w-3.5 h-3.5 text-slate-400" />
-                                {stats.count} o'quvchi
-                              </span>
-                              <span className="text-slate-650">|</span>
-                              <span className="font-bold text-blue-400 flex items-center gap-1">
-                                <BookOpen className="w-3.5 h-3.5 text-blue-400" />
-                                {stats.pages} ball
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="p-2 bg-white/5 text-slate-400 rounded-xl group-hover:bg-blue-500/20 group-hover:text-blue-400 transition-colors">
+                          <div className="w-8 h-8 rounded-xl bg-white/[0.04] group-hover:bg-indigo-500/20 text-slate-400 group-hover:text-indigo-300 flex items-center justify-center transition-colors">
                             <ArrowUpRight className="w-4 h-4" />
                           </div>
                         </div>
-                      </motion.div>
+
+                        <div className="pt-3 border-t border-white/[0.05] flex items-center justify-between text-xs">
+                          <span className="text-slate-400 font-medium">
+                            {stats.count} o'quvchi
+                          </span>
+                          <span className="font-mono font-semibold text-indigo-400">
+                            {stats.pages.toLocaleString()} bet
+                          </span>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -431,7 +456,11 @@ export default function App() {
         {/* TAB 6: SETTINGS & VERSION MANAGEMENT */}
         {activeTab === "settings" && (
           <div id="settings_tab" className="animate-fade-in duration-300">
-            <SettingsSection />
+            <SettingsSection
+              onSeed100Students={handleSeed100Students}
+              onClearAllStudents={() => setIsResetConfirmOpen(true)}
+              totalStudentsCount={totalStudentsCount}
+            />
           </div>
         )}
 
@@ -482,23 +511,10 @@ export default function App() {
       <ConfirmModal
         isOpen={isResetConfirmOpen}
         onClose={() => setIsResetConfirmOpen(false)}
-        onConfirm={async () => {
-          setIsResetConfirmOpen(false);
-          localStorage.setItem("zukko_cleared", "true");
-          try {
-            const batch = writeBatch(db);
-            const querySnapshot = await getDocs(collection(db, "students"));
-            querySnapshot.forEach((doc) => {
-              batch.delete(doc.ref);
-            });
-            await batch.commit();
-          } catch (error) {
-            handleFirestoreError(error, OperationType.DELETE, "students");
-          }
-        }}
-        title="Ma'lumotlarni Tozalash"
-        message="Siz haqiqatan ham barcha o'quvchilar va ularning kiritilgan kitobxonlik natijalarini o'chirib, loyihani toza holatga keltirmoqchimisiz? Ushbu amalni ortga qaytarib bo'lmaydi!"
-        confirmLabel="Ha, tozalash"
+        onConfirm={handleClearAllStudents}
+        title="Ma'lumotlarni Tozalash (O'chirish)"
+        message="Siz rostdan ham barcha kiritilgan o'quvchilarni va ularning mutolaa natijalarini to'liq o'chirib tashlamoqchimisiz? Keyinchalik xohlasangiz 100 ta sinov o'quvchisini birgina tugma bilan qayta tiklashingiz mumkin."
+        confirmLabel="Ha, barchasini o'chirish"
         cancelLabel="Bekor qilish"
         isDanger={true}
       />

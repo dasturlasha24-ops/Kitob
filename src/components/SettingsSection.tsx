@@ -1,10 +1,21 @@
 import React from "react";
 import { 
   Settings, Sparkles, Clock, GitBranch, ArrowUpRight, 
-  CheckCircle2, ChevronRight, Award, Zap, ShieldCheck, Star 
+  CheckCircle2, ChevronRight, Award, Zap, ShieldCheck, Star,
+  Database, RefreshCw, Trash2
 } from "lucide-react";
 
-export default function SettingsSection() {
+interface SettingsSectionProps {
+  onSeed100Students?: () => void;
+  onClearAllStudents?: () => void;
+  totalStudentsCount?: number;
+}
+
+export default function SettingsSection({
+  onSeed100Students,
+  onClearAllStudents,
+  totalStudentsCount = 0
+}: SettingsSectionProps) {
   return (
     <div className="space-y-8 animate-fade-in font-sans pb-12">
       
@@ -136,6 +147,49 @@ export default function SettingsSection() {
                   Xotiradagi o'quvchilar ma'lumotlari kesh tozalanishidan zarar ko'rmaydi, u yangilangan so'nggi dizayn bilan ravon ochiladi!
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Test Data Management Card */}
+          <div className="bg-[#090b0f] border border-white/5 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl relative overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Database className="w-5 h-5 text-indigo-400" /> Sinov Ma'lumotlari (100 ta O'quvchi)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Tizimni sinash uchun 5–11 sinflarga taqsimlangan 100 ta o'quvchini boshqarish
+                </p>
+              </div>
+              <span className="text-xs bg-indigo-500/10 text-indigo-400 font-mono font-bold px-2.5 py-1 rounded-full border border-indigo-500/20">
+                {totalStudentsCount} o'quvchi
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Siz bergan 100 ta o'quvchi ism-familiyalari 5–11 sinflarga teng taqsimlanib, ularga sinov mutolaa ballari biriktirilgan. Sinab bo'lgach, birgina tugma orqali barcha ma'lumotlarni tozalab tashlashingiz mumkin.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              {onSeed100Students && (
+                <button
+                  onClick={onSeed100Students}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  100 ta O'quvchini Yuklash / Qayta Tiklash
+                </button>
+              )}
+
+              {onClearAllStudents && (
+                <button
+                  onClick={onClearAllStudents}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-semibold rounded-xl shadow-sm transition-all cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-400" />
+                  Barcha O'quvchilarni O'chirish (Tozalash)
+                </button>
+              )}
             </div>
           </div>
 

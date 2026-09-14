@@ -98,7 +98,7 @@ export default function ClassDetailView({
         <tr ${isOdd && i > 2 ? "style='background-color: #f8fafc;'" : ""}>
           <td align="center" ${rankStyle}>${i + 1}${medal}</td>
           <td style="font-weight: 500; font-size: 13px; color: #0f172a;">${st.firstName} ${st.lastName}</td>
-          <td align="center" style="font-weight: 550;">${st.grade}-sinf</td>
+          <td align="center" style="font-weight: 550;">${st.grade.endsWith("-sinf") ? st.grade : `${st.grade}-sinf`}</td>
           <td align="center" style="font-weight: bold; color: #0284c7;">${st.readingLogs.length} ta kitob</td>
           <td align="center" style="font-weight: bold; color: #10b981; font-size: 13px;">${st.totalPoints} bet</td>
           <td align="center">${new Date(st.createdAt).toLocaleDateString("uz-UZ")}</td>
@@ -271,7 +271,7 @@ export default function ClassDetailView({
             </p>
             {classLeader && (
               <p className="text-xs text-yellow-500 font-mono mt-0.5">
-                {classLeader.totalPoints} sahifa (ball)
+                {classLeader.totalPoints.toLocaleString()} bet
               </p>
             )}
           </div>
@@ -357,8 +357,8 @@ export default function ClassDetailView({
                   {/* Points Display and Expand Indicator */}
                   <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-0 pt-3 sm:pt-0 border-white/5">
                     <div className="flex items-baseline gap-1 bg-blue-600/10 text-blue-300 border border-blue-500/20 px-4 py-2 rounded-2xl font-display">
-                      <span className="text-xl font-extrabold">{student.totalPoints}</span>
-                      <span className="text-xs font-semibold">ball</span>
+                      <span className="text-xl font-extrabold">{student.totalPoints.toLocaleString()}</span>
+                      <span className="text-xs font-semibold">bet</span>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -442,7 +442,7 @@ export default function ClassDetailView({
                             {/* Pages Input */}
                             <div className="space-y-1.5">
                               <label className="block text-xs font-semibold text-slate-400 font-display">
-                                O'qilgan betlar soni (1 bet = 1 ball)
+                                O'qilgan betlar soni
                               </label>
                               <div className="relative">
                                 <input
