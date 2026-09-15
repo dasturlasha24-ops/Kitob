@@ -180,4 +180,5 @@ export function generate100TestStudents(): Student[] {
   });
 }
 
-export const INITIAL_STUDENTS: Student[] = generate100TestStudents();
+// Default empty initial students for clean production use
+export const INITIAL_STUDENTS: Student[] = [];

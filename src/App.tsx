@@ -6,7 +6,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 
 import { Student } from "./types";
-import { GRADES, INITIAL_STUDENTS } from "./data/mockData";
+import { GRADES, INITIAL_STUDENTS, generate100TestStudents } from "./data/mockData";
 import { db, auth, handleFirestoreError, OperationType } from "./firebase";
 import { collection, onSnapshot, query, orderBy, setDoc, doc, deleteDoc, writeBatch, getDocs } from "firebase/firestore";
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
@@ -32,8 +32,17 @@ export default function App() {
   // Selected grade when searching inside a class (e.g., "5-sinf")
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
 
-  // Core students state loaded from localStorage
+  // Core students state loaded from localStorage (defaults to empty for clean production use)
   const [students, setStudents] = useState<Student[]>(() => {
+    // If not explicitly cleaned before, start clean
+    if (!localStorage.getItem("zukko_production_cleaned_v2")) {
+      localStorage.setItem("zukko_production_cleaned_v2", "true");
+      localStorage.setItem("zukko_cleared", "true");
+      localStorage.removeItem("zukko_100_students_loaded");
+      localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
+      return [];
+    }
+
     const saved = localStorage.getItem("zukko_kitobxon_students");
     if (saved) {
       try {
@@ -42,7 +51,7 @@ export default function App() {
         console.error("Error parsing saved students from localStorage", e);
       }
     }
-    return INITIAL_STUDENTS;
+    return [];
   });
 
   // State to control add student modal
@@ -85,23 +94,29 @@ export default function App() {
   useEffect(() => {
     const q = query(collection(db, "students"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-      // Auto-seed 100 students if the collection is empty or not yet loaded with 100 test students
-      if (
-        (snapshot.empty && !localStorage.getItem("zukko_cleared")) ||
-        (!localStorage.getItem("zukko_100_students_loaded") && snapshot.size < 50 && !localStorage.getItem("zukko_cleared"))
-      ) {
-        try {
-          const batch = writeBatch(db);
-          INITIAL_STUDENTS.forEach((student) => {
-            const docRef = doc(db, "students", student.id);
-            batch.set(docRef, student);
-          });
-          await batch.commit();
-          localStorage.setItem("zukko_100_students_loaded", "true");
-          return;
-        } catch (error) {
-          console.error("Error seeding 100 test students to Firestore:", error);
+      // One-time automatic clean of previously loaded test students
+      if (!localStorage.getItem("zukko_production_cleaned_db_v2")) {
+        localStorage.setItem("zukko_production_cleaned_db_v2", "true");
+        localStorage.setItem("zukko_cleared", "true");
+        localStorage.removeItem("zukko_100_students_loaded");
+        localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
+
+        // If there are documents, delete them all so project is completely clean for real use
+        if (!snapshot.empty) {
+          try {
+            const batch = writeBatch(db);
+            snapshot.forEach((docSnap) => {
+              batch.delete(docSnap.ref);
+            });
+            await batch.commit();
+            setStudents([]);
+            return;
+          } catch (e) {
+            console.warn("Clean-up notice:", e);
+          }
         }
+        setStudents([]);
+        return;
       }
 
       const list: Student[] = [];
@@ -207,11 +222,12 @@ export default function App() {
     }
   };
 
-  // Handler to seed the 100 test students
+  // Handler to seed the 100 test students if requested in Settings
   const handleSeed100Students = async () => {
     try {
       const batch = writeBatch(db);
-      INITIAL_STUDENTS.forEach((student) => {
+      const testStudents = generate100TestStudents();
+      testStudents.forEach((student) => {
         const docRef = doc(db, "students", student.id);
         batch.set(docRef, student);
       });
@@ -285,16 +301,21 @@ export default function App() {
         </button>
       </header>
 
-      {/* 2. Responsive Side Navigation Panel */}
+      {/* 2. Desktop constant spacer: Keeps a steady 80px gutter so the main window NEVER resizes or gets squeezed */}
+      <div className="hidden lg:block w-20 shrink-0 pointer-events-none" aria-hidden="true" />
+
+      {/* 3. Smooth Floating Sidebar (Drawer / Overlay) */}
       <div 
         id="sidebar_container"
         onMouseEnter={() => setIsSidebarHovered(true)}
         onMouseLeave={() => setIsSidebarHovered(false)}
-        className={`${
-          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        } fixed lg:static inset-y-0 left-0 w-72 sm:w-80 lg:w-auto ${
-          isSidebarHovered ? "lg:w-72" : "lg:w-20"
-        } z-50 lg:z-auto sidebar-smooth-transition`}
+        className={`fixed inset-y-0 left-0 z-50 h-screen flex flex-col sidebar-smooth-transition ${
+          isMobileSidebarOpen 
+            ? "translate-x-0 w-72 sm:w-80 shadow-[0_0_60px_rgba(0,0,0,0.9)]" 
+            : "-translate-x-full lg:translate-x-0"
+        } ${
+          isSidebarHovered ? "lg:w-72 shadow-[0_0_50px_rgba(0,0,0,0.85)]" : "lg:w-20 shadow-xl"
+        }`}
       >
         <Sidebar
           activeTab={activeTab}
@@ -307,21 +328,21 @@ export default function App() {
           totalPagesRead={totalPagesRead}
           topStudentName={topStudent ? `${topStudent.firstName} ${topStudent.lastName}` : undefined}
           topStudentPoints={topStudent ? topStudent.totalPoints : undefined}
-          isHovered={isSidebarHovered}
+          isHovered={isSidebarHovered || isMobileSidebarOpen}
           onLogout={() => setIsLogoutConfirmOpen(true)}
         />
-
-        {/* Backdrop for mobile drawer */}
-        {isMobileSidebarOpen && (
-          <div
-            onClick={() => setIsMobileSidebarOpen(false)}
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm lg:hidden z-[-1]"
-          />
-        )}
       </div>
 
-      {/* 3. Main Workspace Container */}
-      <main id="main_workspace" className="flex-1 p-4 sm:p-8 lg:p-10 overflow-y-auto max-w-7xl mx-auto w-full z-10">
+      {/* Backdrop for mobile drawer */}
+      {isMobileSidebarOpen && (
+        <div
+          onClick={() => setIsMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs lg:hidden z-40 transition-opacity duration-300"
+        />
+      )}
+
+      {/* 4. Main Workspace Container */}
+      <main id="main_workspace" className="flex-1 min-w-0 p-4 sm:p-8 lg:p-10 pt-20 lg:pt-10 overflow-y-auto max-w-7xl mx-auto w-full z-10">
         
         {/* TAB 1: O'QUVCHILAR SECTION */}
         {activeTab === "students" && (
@@ -352,13 +373,6 @@ export default function App() {
                       </button>
                     )}
                     <button
-                      onClick={handleSeed100Students}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 rounded-xl text-xs font-medium transition-all cursor-pointer"
-                      title="100 ta sinov o'quvchisini yuklash"
-                    >
-                      100 ta o'quvchini yuklash
-                    </button>
-                    <button
                       onClick={() => {
                         setSelectedGrade(null);
                         setIsAddModalOpen(true);
@@ -370,6 +384,18 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+
+                {/* Clean onboarding alert when no students exist yet */}
+                {totalStudentsCount === 0 && (
+                  <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-slate-300 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+                      <span>
+                        Tizim toza holatda foydalanishga tayyor! Yuqoridagi <strong className="text-white font-semibold">"O'quvchi qo'shish"</strong> tugmasi orqali yangi o'quvchilarni kiritishingiz mumkin.
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* 3 Minimal Stat Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
