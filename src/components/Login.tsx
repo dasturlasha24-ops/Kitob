@@ -52,8 +52,8 @@ export default function Login() {
         
         {/* Logo and Greeting Header */}
         <div className="text-center mb-8 space-y-3">
-          <div className="inline-flex p-3 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow-xl shadow-indigo-500/10 border border-white/10 animate-bounce" style={{ animationDuration: '4s' }}>
-            <BookOpen className="w-8 h-8 text-white" />
+          <div className="inline-flex w-16 h-16 rounded-3xl overflow-hidden shadow-2xl shadow-blue-500/25 border border-white/15 p-1 bg-gradient-to-br from-blue-500 to-indigo-600 animate-bounce" style={{ animationDuration: '4s' }}>
+            <img src="/pwa-192x192.png" alt="Zukko Kitobxon" className="w-full h-full object-cover rounded-[20px]" />
           </div>
           
           <div className="space-y-1">

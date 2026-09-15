@@ -26,11 +26,11 @@ export default function Sidebar({
     <aside className="w-full h-full bg-[#090b0f]/98 backdrop-blur-3xl border-r border-white/10 text-slate-100 flex flex-col overflow-hidden select-none">
       {/* Brand logo & title */}
       <div className="p-5 border-b border-white/10 flex items-center gap-3">
-        <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl text-white shadow-lg shadow-blue-500/25 shrink-0 hover:scale-105 transition-transform duration-250">
-          <BookOpen className="w-6 h-6" strokeWidth={2} />
+        <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-lg shadow-blue-500/20 border border-white/15 shrink-0 hover:scale-105 transition-transform bg-[#090b0f]">
+          <img src="/pwa-192x192.png" alt="Zukko Kitobxon Icon" className="w-full h-full object-cover" />
         </div>
         <div className={`transition-all duration-300 flex flex-col overflow-hidden whitespace-nowrap ${isHovered ? "opacity-100 w-44 translate-x-0" : "opacity-0 w-0 -translate-x-3 pointer-events-none"}`}>
-          <span className="text-[10px] uppercase tracking-widest font-bold bg-white/10 text-blue-400 px-2 py-0.5 rounded-md font-mono w-fit">
+          <span className="text-[10px] uppercase tracking-widest font-bold bg-blue-500/15 text-blue-400 px-2 py-0.5 rounded-md font-mono w-fit border border-blue-500/20">
             SmartLibrary
           </span>
           <h1 className="text-base font-display font-bold tracking-tight text-white mt-0.5">

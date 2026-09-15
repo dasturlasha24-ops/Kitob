@@ -282,14 +282,14 @@ export default function App() {
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-650/10 rounded-full blur-[120px] pointer-events-none" />
 
       {/* 1. Mobile Friendly Top Navigation Bar */}
-      <header id="mobile_header" className="lg:hidden bg-white/5 backdrop-blur-2xl border-b border-white/10 text-white py-4 px-6 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-blue-600 rounded-xl">
-            <BookOpen className="w-5 h-5 text-white" />
+      <header id="mobile_header" className="lg:hidden bg-[#090b0f]/95 backdrop-blur-2xl border-b border-white/10 text-white py-3.5 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl overflow-hidden border border-white/10 shadow-md shrink-0 bg-[#090b0f]">
+            <img src="/pwa-192x192.png" alt="Zukko Kitobxon" className="w-full h-full object-cover" />
           </div>
           <div>
-            <span className="text-[10px] font-mono font-black text-blue-400 uppercase tracking-widest">KUTUBXONA</span>
-            <h1 className="text-base font-display font-extrabold text-white">Zukko Kitobxon</h1>
+            <span className="text-[10px] font-mono font-bold text-blue-400 uppercase tracking-widest block">KUTUBXONA</span>
+            <h1 className="text-sm sm:text-base font-display font-extrabold text-white leading-tight">Zukko Kitobxon</h1>
           </div>
         </div>
 
