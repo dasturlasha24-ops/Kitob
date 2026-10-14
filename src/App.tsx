@@ -6,7 +6,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 
 import { Student } from "./types";
-import { GRADES, INITIAL_STUDENTS, generate100TestStudents } from "./data/mockData";
+import { GRADES, INITIAL_STUDENTS, generate100TestStudents, normalizeGrade } from "./data/mockData";
 import { db, auth, handleFirestoreError, OperationType } from "./firebase";
 import { collection, onSnapshot, query, orderBy, setDoc, doc, deleteDoc, writeBatch, getDocs } from "firebase/firestore";
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
@@ -39,7 +39,12 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.map((s: Student) => ({
+            ...s,
+            grade: normalizeGrade(s.grade)
+          }));
+        }
       } catch (e) {
         console.error("Error parsing saved students from localStorage", e);
       }
@@ -115,7 +120,12 @@ export default function App() {
         if (!snapshot.empty) {
           const list: Student[] = [];
           snapshot.forEach((docSnap) => {
-            list.push({ id: docSnap.id, ...docSnap.data() } as Student);
+            const data = docSnap.data();
+            list.push({ 
+              id: docSnap.id, 
+              ...data,
+              grade: normalizeGrade(data.grade)
+            } as Student);
           });
           setStudents(list);
           localStorage.setItem("zukko_kitobxon_students", JSON.stringify(list));
@@ -459,30 +469,33 @@ export default function App() {
                   <p className="text-xs text-slate-500 mt-0.5">O'quvchilar ro'yxati va yangi kitob kiritish uchun sinf kartasini bosing</p>
                 </div>
 
-                {/* The 5-11 Classes Grid - Minimal & Aesthetic */}
+                {/* The Classes Grid - Minimal & Aesthetic */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {GRADES.map((gradeName) => {
                     const stats = getGradeSummaryStats(gradeName);
+                    const isTraditionalClass = gradeName.includes("-sinf");
                     
                     return (
                       <div
                         key={gradeName}
                         onClick={() => setSelectedGrade(gradeName)}
-                        className="bg-[#0e1118] hover:bg-[#121620] border border-white/[0.07] hover:border-indigo-500/40 rounded-2xl p-5 transition-all cursor-pointer group flex flex-col justify-between h-40"
+                        className="bg-[#0e1118] hover:bg-[#121620] border border-white/[0.07] hover:border-indigo-500/40 rounded-2xl p-5 transition-all cursor-pointer group flex flex-col justify-between min-h-[160px] h-full"
                       >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">Sinf</span>
-                            <h4 className="text-xl font-display font-bold text-white mt-0.5 group-hover:text-indigo-300 transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">
+                              {isTraditionalClass ? "Sinf" : "Guruh / Yo'nalish"}
+                            </span>
+                            <h4 className="text-lg sm:text-xl font-display font-bold text-white mt-1 group-hover:text-indigo-300 transition-colors leading-snug break-words">
                               {gradeName}
                             </h4>
                           </div>
-                          <div className="w-8 h-8 rounded-xl bg-white/[0.04] group-hover:bg-indigo-500/20 text-slate-400 group-hover:text-indigo-300 flex items-center justify-center transition-colors">
+                          <div className="w-8 h-8 rounded-xl bg-white/[0.04] group-hover:bg-indigo-500/20 text-slate-400 group-hover:text-indigo-300 flex items-center justify-center transition-colors shrink-0">
                             <ArrowUpRight className="w-4 h-4" />
                           </div>
                         </div>
 
-                        <div className="pt-3 border-t border-white/[0.05] flex items-center justify-between text-xs">
+                        <div className="pt-3 border-t border-white/[0.05] flex items-center justify-between text-xs mt-3">
                           <span className="text-slate-400 font-medium">
                             {stats.count} o'quvchi
                           </span>

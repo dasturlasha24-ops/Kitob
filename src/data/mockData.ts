@@ -3,12 +3,25 @@ import { Student } from "../types";
 export const GRADES = [
   "5-sinf",
   "6-sinf",
-  "7-sinf",
-  "8-sinf",
-  "9-sinf",
-  "10-sinf",
-  "11-sinf"
+  "Matimatika, Engilish 1",
+  "Matimatika, Engilish 2",
+  "Tarix, Engilish",
+  "Matimatika, Fizika",
+  "Engilish, Ona-tili"
 ];
+
+export const GRADE_LEGACY_MAP: Record<string, string> = {
+  "7-sinf": "Matimatika, Engilish 1",
+  "8-sinf": "Matimatika, Engilish 2",
+  "9-sinf": "Tarix, Engilish",
+  "10-sinf": "Matimatika, Fizika",
+  "11-sinf": "Engilish, Ona-tili"
+};
+
+export function normalizeGrade(grade: string): string {
+  if (!grade) return GRADES[0];
+  return GRADE_LEGACY_MAP[grade] || grade;
+}
 
 export const MOCK_BOOKS = [
   { title: "Sariq devni minib", pages: 240 },

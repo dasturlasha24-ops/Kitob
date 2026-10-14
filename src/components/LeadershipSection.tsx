@@ -24,7 +24,10 @@ export interface ZoneStyle {
 
 function formatGrade(grade: string): string {
   if (!grade) return "";
-  return grade.endsWith("-sinf") ? grade : `${grade}-sinf`;
+  if (grade.includes("-sinf") || isNaN(Number(grade))) {
+    return grade;
+  }
+  return `${grade}-sinf`;
 }
 
 export function getStudentZone(rank: number, total: number, points: number): ZoneStyle {
@@ -272,7 +275,7 @@ export default function LeadershipSection({ students }: LeadershipSectionProps) 
             onChange={(e) => setSelectedGradeFilter(e.target.value)}
             className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer transition-all"
           >
-            <option value="all">Barcha sinflar</option>
+            <option value="all">Barcha sinf va guruhlar</option>
             {GRADES.map((g) => (
               <option key={g} value={g}>{formatGrade(g)}</option>
             ))}

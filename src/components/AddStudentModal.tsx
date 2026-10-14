@@ -155,7 +155,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, defaultGra
               Sinfni tanlang
             </label>
             
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
               {GRADES.map((g) => {
                 const isSelected = grade === g;
                 return (
@@ -163,20 +163,21 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, defaultGra
                     key={g}
                     type="button"
                     onClick={() => setGrade(g)}
-                    className={`py-2 px-1 text-xs font-semibold rounded-xl text-center border transition-all ${
+                    className={`py-2 px-3 text-xs font-semibold rounded-xl text-left border transition-all flex items-center justify-between ${
                       isSelected
-                        ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/10"
+                        ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/20"
                         : "bg-white/5 hover:bg-white/10 border-white/10 text-slate-300 hover:text-white"
                     }`}
                   >
-                    {g.replace("-sinf", "")}
+                    <span className="truncate">{g}</span>
+                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white ml-1 shrink-0" />}
                   </button>
                 );
               })}
             </div>
             
-            <p className="text-xs text-slate-500 font-mono mt-1 text-right">
-              Faol tanlangan sinf: <span className="font-semibold text-slate-300">{grade}</span>
+            <p className="text-xs text-slate-400 font-mono mt-1 text-right">
+              Tanlangan: <span className="font-semibold text-blue-300">{grade}</span>
             </p>
           </div>
 

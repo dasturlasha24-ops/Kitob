@@ -98,7 +98,7 @@ export default function ClassDetailView({
         <tr ${isOdd && i > 2 ? "style='background-color: #f8fafc;'" : ""}>
           <td align="center" ${rankStyle}>${i + 1}${medal}</td>
           <td style="font-weight: 500; font-size: 13px; color: #0f172a;">${st.firstName} ${st.lastName}</td>
-          <td align="center" style="font-weight: 550;">${st.grade.endsWith("-sinf") ? st.grade : `${st.grade}-sinf`}</td>
+          <td align="center" style="font-weight: 550;">${st.grade}</td>
           <td align="center" style="font-weight: bold; color: #0284c7;">${st.readingLogs.length} ta kitob</td>
           <td align="center" style="font-weight: bold; color: #10b981; font-size: 13px;">${st.totalPoints} bet</td>
           <td align="center">${new Date(st.createdAt).toLocaleDateString("uz-UZ")}</td>
@@ -181,9 +181,10 @@ export default function ClassDetailView({
     
     const blob = new Blob([excelTemplate], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
+    const safeFileName = grade.replace(/[^a-zA-Z0-9]/g, "_");
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Zukko_Kitobxon_${grade}_sinf_Ro'yxati.xls`);
+    link.setAttribute("download", `Zukko_Kitobxon_${safeFileName}_Ro'yxati.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
