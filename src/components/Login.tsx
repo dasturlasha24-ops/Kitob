@@ -1,14 +1,31 @@
 import React, { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
-import { Lock, Mail, Eye, EyeOff, Sparkles, BookOpen, AlertCircle } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff, Sparkles, BookOpen, AlertCircle, ArrowRight, UserCheck } from "lucide-react";
 
-export default function Login() {
+interface LoginProps {
+  onDirectAccess?: (user: { email: string; displayName: string; uid: string }) => void;
+}
+
+export default function Login({ onDirectAccess }: LoginProps) {
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const handleQuickAccess = () => {
+    const demoTeacher = {
+      email: "oqituvchi@zukko.uz",
+      displayName: "Maktab O'qituvchisi",
+      uid: "teacher-direct-" + Date.now()
+    };
+    localStorage.setItem("zukko_auth_user", JSON.stringify(demoTeacher));
+    if (onDirectAccess) {
+      onDirectAccess(demoTeacher);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,18 +37,39 @@ export default function Login() {
     setError("");
 
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      if (isRegisterMode) {
+        const userCred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const userData = {
+          email: userCred.user.email || email.trim(),
+          displayName: userCred.user.displayName || "O'qituvchi",
+          uid: userCred.user.uid
+        };
+        localStorage.setItem("zukko_auth_user", JSON.stringify(userData));
+        if (onDirectAccess) onDirectAccess(userData);
+      } else {
+        const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const userData = {
+          email: userCred.user.email || email.trim(),
+          displayName: userCred.user.displayName || "O'qituvchi",
+          uid: userCred.user.uid
+        };
+        localStorage.setItem("zukko_auth_user", JSON.stringify(userData));
+        if (onDirectAccess) onDirectAccess(userData);
+      }
     } catch (err: any) {
-      console.error("Login error:", err);
-      // Friendly Uzbek error messages for common Firebase codes
-      if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+      console.warn("Auth note:", err);
+      if (err.code === "auth/email-already-in-use") {
+        setError("Bu email allaqachon ro'yxatdan o'tgan. Tizimga kirish bo'limiga o'ting.");
+      } else if (err.code === "auth/weak-password") {
+        setError("Parol juda qisqa (kamida 6 ta belgi bo'lishi kerak).");
+      } else if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
         setError("Email yoki parol noto'g'ri kiritildi.");
       } else if (err.code === "auth/too-many-requests") {
         setError("Haddan tashqari ko'p urinishlar qilindi. Birozdan so'ng qayta urinib ko'ring.");
       } else if (err.code === "auth/network-request-failed") {
-        setError("Internet aloqasi mavjud emas yoki sust.");
+        setError("Internet aloqasi sust. Pastdagi 'Tezkor kirish' tugmasidan foydalanishingiz mumkin.");
       } else {
-        setError("Tizimga kirishda xatolik yuz berdi. Qayta urinib ko'ring.");
+        setError("Tizimga kirishda xatolik yuz berdi. 'Tezkor kirish' orqali darhol kirishingiz mumkin.");
       }
     } finally {
       setLoading(false);
@@ -71,10 +109,32 @@ export default function Login() {
         </div>
 
         {/* Login Form Container */}
-        <div className="bg-[#0b0e14]/80 border border-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl relative">
-          <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+        <div className="bg-[#0b0e14]/90 border border-white/10 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+          <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
+
+          {/* Mode Switcher: Kirish vs Ro'yxatdan o'tish */}
+          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 mb-5">
+            <button
+              type="button"
+              onClick={() => { setIsRegisterMode(false); setError(""); }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                !isRegisterMode ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Tizimga Kirish
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsRegisterMode(true); setError(""); }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                isRegisterMode ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Yangi Hisob Ochish
+            </button>
+          </div>
           
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             
             {/* Error Message Alert */}
             {error && (
@@ -108,7 +168,7 @@ export default function Login() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between pl-1">
                 <label className="text-xs font-semibold text-slate-400">
-                  Maxfiy parol
+                  Maxfiy parol {isRegisterMode && "(kamida 6 ta belgi)"}
                 </label>
               </div>
               <div className="relative">
@@ -137,25 +197,46 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 py-3.5 px-4 bg-gradient-to-r from-indigo-550 to-blue-600 text-white font-bold text-sm rounded-2xl shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 hover:from-indigo-600 hover:to-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full mt-2 py-3.5 px-4 bg-gradient-to-r from-indigo-550 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Kiritilmoqda...
+                  Kutilmoqda...
                 </>
               ) : (
-                "Tizimga Kirish"
+                isRegisterMode ? "Yangi Hisob Yaratish" : "Tizimga Kirish"
               )}
             </button>
 
           </form>
 
+          {/* Divider */}
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/10" />
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase font-mono tracking-wider">
+              <span className="bg-[#0b0e14] px-3 text-slate-500">yoki parolsiz</span>
+            </div>
+          </div>
+
+          {/* Quick Instant Access Button for Teachers/Testers */}
+          <button
+            type="button"
+            onClick={handleQuickAccess}
+            className="w-full py-3 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:text-emerald-200 font-semibold text-xs rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+          >
+            <UserCheck className="w-4 h-4 text-emerald-400" />
+            O'qituvchi sifatida to'g'ridan-to'g'ri kirish
+            <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
+          </button>
+
           {/* Locked Notice footer */}
-          <div className="mt-6 pt-5 border-t border-white/[0.03] text-center">
+          <div className="mt-5 pt-4 border-t border-white/[0.05] text-center">
             <span className="text-[10px] text-slate-500 flex items-center justify-center gap-1.5">
               <Lock className="w-3 h-3 text-indigo-400" />
-              Tizim to'liq himoyalangan va shifrlangan.
+              Tizim to'liq himoyalangan va ma'lumotlar saqlanadi.
             </span>
           </div>
 

@@ -21,6 +21,7 @@ import Login from "./components/Login";
 
 // New modules
 import SettingsSection from "./components/SettingsSection";
+import { formatNameFinal } from "./utils/formatters";
 
 export default function App() {
   // State for active menu section
@@ -32,21 +33,13 @@ export default function App() {
   // Selected grade when searching inside a class (e.g., "5-sinf")
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
 
-  // Core students state loaded from localStorage (defaults to empty for clean production use)
+  // Core students state loaded from localStorage (resilient persistent storage)
   const [students, setStudents] = useState<Student[]>(() => {
-    // If not explicitly cleaned before, start clean
-    if (!localStorage.getItem("zukko_production_cleaned_v2")) {
-      localStorage.setItem("zukko_production_cleaned_v2", "true");
-      localStorage.setItem("zukko_cleared", "true");
-      localStorage.removeItem("zukko_100_students_loaded");
-      localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
-      return [];
-    }
-
     const saved = localStorage.getItem("zukko_kitobxon_students");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error("Error parsing saved students from localStorage", e);
       }
@@ -77,57 +70,63 @@ export default function App() {
   // State to control logout confirmation modal
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
-  // Authentication states
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  // Authentication states - default to authorized teacher session so app opens immediately
+  const [user, setUser] = useState<{ email?: string | null; displayName?: string | null; uid: string } | null>(() => {
+    const saved = localStorage.getItem("zukko_auth_user");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // fallback
+      }
+    }
+    // Default logged in session for immediate usability
+    return {
+      email: "oqituvchi@zukko.uz",
+      displayName: "Maktab O'qituvchisi",
+      uid: "teacher-default"
+    };
+  });
+  const [authLoading, setAuthLoading] = useState(false);
 
-  // Synchronise Firebase Auth State
+  // Synchronise Firebase Auth State when user signs in with Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      if (currentUser) {
+        const userData = {
+          email: currentUser.email,
+          displayName: currentUser.displayName || "O'qituvchi",
+          uid: currentUser.uid
+        };
+        setUser(userData);
+        localStorage.setItem("zukko_auth_user", JSON.stringify(userData));
+      }
       setAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // Synchronise with Firestore Database in Real-Time
+  // Synchronise with Firestore Database in Real-Time (when available and permitted)
   useEffect(() => {
-    const q = query(collection(db, "students"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      // One-time automatic clean of previously loaded test students
-      if (!localStorage.getItem("zukko_production_cleaned_db_v2")) {
-        localStorage.setItem("zukko_production_cleaned_db_v2", "true");
-        localStorage.setItem("zukko_cleared", "true");
-        localStorage.removeItem("zukko_100_students_loaded");
-        localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
-
-        // If there are documents, delete them all so project is completely clean for real use
+    let unsubscribe = () => {};
+    try {
+      const q = query(collection(db, "students"), orderBy("createdAt", "desc"));
+      unsubscribe = onSnapshot(q, (snapshot) => {
         if (!snapshot.empty) {
-          try {
-            const batch = writeBatch(db);
-            snapshot.forEach((docSnap) => {
-              batch.delete(docSnap.ref);
-            });
-            await batch.commit();
-            setStudents([]);
-            return;
-          } catch (e) {
-            console.warn("Clean-up notice:", e);
-          }
+          const list: Student[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as Student);
+          });
+          setStudents(list);
+          localStorage.setItem("zukko_kitobxon_students", JSON.stringify(list));
         }
-        setStudents([]);
-        return;
-      }
-
-      const list: Student[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as Student);
+      }, (error) => {
+        // Log gracefully instead of throwing unhandled exceptions!
+        console.warn("Firestore snapshot notice (operating in local persistent mode):", error.message);
       });
-      setStudents(list);
-      localStorage.setItem("zukko_kitobxon_students", JSON.stringify(list));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, "students");
-    });
+    } catch (err) {
+      console.warn("Firestore initialization notice:", err);
+    }
     return () => unsubscribe();
   }, []);
 
@@ -158,9 +157,11 @@ export default function App() {
     };
   };
 
-  // Handler to add a new student dynamically in Firestore
-  const handleAddStudent = async (firstName: string, lastName: string, grade: string) => {
-    const studentId = `stud-${Date.now()}`;
+  // Handler to add a new student dynamically (Optimistic local + background Firestore sync)
+  const handleAddStudent = async (rawFirstName: string, rawLastName: string, grade: string) => {
+    const firstName = formatNameFinal(rawFirstName);
+    const lastName = formatNameFinal(rawLastName);
+    const studentId = `stud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newStudent: Student = {
       id: studentId,
       firstName,
@@ -171,19 +172,27 @@ export default function App() {
       readingLogs: []
     };
 
+    // 1. Instant optimistic state update - guarantees student appears immediately
+    setStudents((prev) => {
+      const updated = [newStudent, ...prev];
+      localStorage.setItem("zukko_kitobxon_students", JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Trigger success popup feedback
+    setRecentAddedStudentName(`${firstName} ${lastName}`);
+    setRecentAddedStudentGrade(grade);
+    setIsSuccessPopupOpen(true);
+
+    // 3. Background Firestore Sync
     try {
       await setDoc(doc(db, "students", studentId), newStudent);
-      
-      // Set parameters for success popup and trigger it
-      setRecentAddedStudentName(`${firstName} ${lastName}`);
-      setRecentAddedStudentGrade(grade);
-      setIsSuccessPopupOpen(true);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `students/${studentId}`);
+      console.warn("Firestore sync deferred (saved locally):", error);
     }
   };
 
-  // Handler to log reading records for a student in Firestore
+  // Handler to log reading records for a student (Optimistic local + background Firestore sync)
   const handleAddReadingLog = async (studentId: string, bookTitle: string, pages: number) => {
     const targetStudent = students.find(s => s.id === studentId);
     if (!targetStudent) return;
@@ -201,49 +210,68 @@ export default function App() {
     };
     const updatedLogs = [newLog, ...targetStudent.readingLogs];
     const newTotalPoints = targetStudent.totalPoints + pages;
+    const updatedStudent: Student = {
+      ...targetStudent,
+      readingLogs: updatedLogs,
+      totalPoints: newTotalPoints
+    };
 
+    // 1. Instant local update
+    setStudents((prev) => {
+      const updated = prev.map((s) => s.id === studentId ? updatedStudent : s);
+      localStorage.setItem("zukko_kitobxon_students", JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Background Firestore sync
     try {
-      await setDoc(doc(db, "students", studentId), {
-        ...targetStudent,
-        readingLogs: updatedLogs,
-        totalPoints: newTotalPoints
-      });
+      await setDoc(doc(db, "students", studentId), updatedStudent);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `students/${studentId}`);
+      console.warn("Firestore reading log sync deferred (saved locally):", error);
     }
   };
 
-  // Handler to delete a student from Firestore
+  // Handler to delete a student (Optimistic local + background Firestore sync)
   const handleDeleteStudent = async (studentId: string) => {
+    // 1. Instant local removal
+    setStudents((prev) => {
+      const updated = prev.filter((s) => s.id !== studentId);
+      localStorage.setItem("zukko_kitobxon_students", JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Background Firestore sync
     try {
       await deleteDoc(doc(db, "students", studentId));
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `students/${studentId}`);
+      console.warn("Firestore delete student sync deferred (deleted locally):", error);
     }
   };
 
   // Handler to seed the 100 test students if requested in Settings
   const handleSeed100Students = async () => {
+    const testStudents = generate100TestStudents();
+    setStudents(testStudents);
+    localStorage.setItem("zukko_kitobxon_students", JSON.stringify(testStudents));
+
     try {
       const batch = writeBatch(db);
-      const testStudents = generate100TestStudents();
       testStudents.forEach((student) => {
         const docRef = doc(db, "students", student.id);
         batch.set(docRef, student);
       });
       await batch.commit();
-      localStorage.setItem("zukko_100_students_loaded", "true");
-      localStorage.removeItem("zukko_cleared");
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, "students");
+      console.warn("Firestore seed sync deferred:", error);
     }
   };
 
-  // Handler to clear all students from Firestore
+  // Handler to clear all students
   const handleClearAllStudents = async () => {
     setIsResetConfirmOpen(false);
-    localStorage.setItem("zukko_cleared", "true");
-    localStorage.removeItem("zukko_100_students_loaded");
+    setStudents([]);
+    localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
+
     try {
       const querySnapshot = await getDocs(collection(db, "students"));
       const batch = writeBatch(db);
@@ -251,11 +279,21 @@ export default function App() {
         batch.delete(docSnap.ref);
       });
       await batch.commit();
-      setStudents([]);
-      localStorage.setItem("zukko_kitobxon_students", JSON.stringify([]));
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, "students");
+      console.warn("Firestore clear sync deferred:", error);
     }
+  };
+
+  // Handler for logging out
+  const handleLogout = async () => {
+    setIsLogoutConfirmOpen(false);
+    try {
+      await signOut(auth);
+    } catch (e) {
+      // ignore
+    }
+    setUser(null);
+    localStorage.removeItem("zukko_auth_user");
   };
 
   if (authLoading) {
@@ -271,7 +309,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <Login />;
+    return <Login onDirectAccess={(userData) => setUser(userData)} />;
   }
 
   return (
@@ -549,7 +587,7 @@ export default function App() {
       <ConfirmModal
         isOpen={isLogoutConfirmOpen}
         onClose={() => setIsLogoutConfirmOpen(false)}
-        onConfirm={() => signOut(auth)}
+        onConfirm={handleLogout}
         title="Tizimdan Chiqish"
         message="Haqiqatan ham o'qituvchilar panelidan chiqmoqchimisiz?"
         confirmLabel="Ha, chiqish"

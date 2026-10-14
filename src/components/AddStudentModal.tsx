@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { X, UserPlus, GraduationCap, AlertCircle } from "lucide-react";
 import { GRADES } from "../data/mockData";
+import { formatNameInput, formatNameFinal } from "../utils/formatters";
 
 interface AddStudentModalProps {
   isOpen: boolean;
@@ -35,14 +36,14 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, defaultGra
     e.preventDefault();
     setError("");
 
-    const trimmedFirstName = firstName.trim();
-    const trimmedLastName = lastName.trim();
+    const formattedFirstName = formatNameFinal(firstName);
+    const formattedLastName = formatNameFinal(lastName);
 
-    if (!trimmedFirstName) {
+    if (!formattedFirstName) {
       setError("Iltimos, o'quvchining ismini kiriting.");
       return;
     }
-    if (!trimmedLastName) {
+    if (!formattedLastName) {
       setError("Iltimos, o'quvchining familiyasini kiriting.");
       return;
     }
@@ -51,7 +52,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, defaultGra
       return;
     }
 
-    onSuccess(trimmedFirstName, trimmedLastName, grade);
+    onSuccess(formattedFirstName, formattedLastName, grade);
     onClose();
   };
 
@@ -116,10 +117,14 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, defaultGra
                 id="firstName"
                 type="text"
                 value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                onChange={(e) => setFirstName(formatNameInput(e.target.value))}
+                onBlur={() => setFirstName(formatNameFinal(firstName))}
                 placeholder="Masalan: Asadbek"
                 autoFocus
-                className="w-full px-4 py-3 rounded-2xl border border-white/10 focus:border-blue-500 transition-colors bg-white/5 outline-none text-white text-sm"
+                autoCapitalize="words"
+                autoCorrect="off"
+                spellCheck={false}
+                className="w-full px-4 py-3 rounded-2xl border border-white/10 focus:border-blue-500 transition-colors bg-white/5 outline-none text-white text-sm capitalize"
               />
             </div>
 
@@ -132,9 +137,13 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess, defaultGra
                 id="lastName"
                 type="text"
                 value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                onChange={(e) => setLastName(formatNameInput(e.target.value))}
+                onBlur={() => setLastName(formatNameFinal(lastName))}
                 placeholder="Masalan: Karimov"
-                className="w-full px-4 py-3 rounded-2xl border border-white/10 focus:border-blue-500 transition-colors bg-white/5 outline-none text-white text-sm"
+                autoCapitalize="words"
+                autoCorrect="off"
+                spellCheck={false}
+                className="w-full px-4 py-3 rounded-2xl border border-white/10 focus:border-blue-500 transition-colors bg-white/5 outline-none text-white text-sm capitalize"
               />
             </div>
           </div>
